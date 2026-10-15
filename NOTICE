@@ -1,0 +1,18 @@
+IaC Packager (iacpack)
+Copyright 2026 the iacpack contributors
+
+This product is licensed under the MIT License.
+See the LICENSE file for the full license text.
+
+DISCLAIMER OF WARRANTY AND LIABILITY
+
+This software is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+OF ANY KIND, either express or implied, including, without limitation, any
+warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS
+FOR A PARTICULAR PURPOSE.
+
+The authors and contributors accept no liability for any damages, data loss,
+security incidents, failed deployments, or other consequences arising from use
+of this software. You use it entirely at your own risk and are solely
+responsible for reviewing generated artifacts, policies, and operational impact
+before applying them in any environment.

@@ -1,0 +1,299 @@
+# =============================================================================
+# EliteEW · stack2 — LLM inference (llama.cpp на GPU; эмбед/реранк по профилям)
+# =============================================================================
+# Запуск: docker compose -f docker/stack/stack2.yml --env-file docker/env_file/.env.stack2 up -d
+#
+# Сети: ew_net_4532, ew_net_2847 (external: docker/scripts/networks-create.sh).
+# Удалённые эмбед/реранк: docker/stack/stack2-llama-remote-embed-rerank.yml; контракт: STACK2-LLM-CONTRACT.md.
+#
+# Профили Compose:
+#   (нет)                     — только llama-chat
+#   local-stack2-embed-rerank — llama-embed + llama-rerank локально
+#   tei-cpu-embed             — TEI (HF CPU) для эмбеддингов
+#   companion-tool-router     — Qwen3-4B FC sidecar для EWA companion Tool Router (см. EWA-COMPANION-TOOL-ROUTER-PILOT-TZ.md)
+#
+# LAN workers (.141): LLAMA_CHAT_CLIENT_BIND=192.168.1.136 в .env.stack2 (см. .env.stack2.lan-bind.example)
+# =============================================================================
+name: stack2
+
+volumes:
+  tei_hf_cache:
+
+networks:
+  ew_net_4532:
+    external: true
+  ew_net_2847:
+    external: true
+services:
+  llama-chat:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: stack2-llama-chat
+    networks:
+      - ew_net_4532
+      - ew_net_2847
+    user: "${STACK2_LLAMA_USER:-0:0}"
+    devices:
+      - "nvidia.com/gpu=all"
+    security_opt:
+      - no-new-privileges:true
+      # Podman+SELinux: CDI maps /dev/nvidia* as xserver_misc_device_t; enforcing blocks getattr/open
+      # for container_t. Keep label=disable scoped only to GPU services in this stack.
+      - label=disable
+    environment:
+      - TZ=Asia/Vladivostok
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      # llama.cpp CUDA graph / concurrent-stream opt (driver 610+). Set 0 to A/B.
+      - GGML_CUDA_GRAPH_OPT=${GGML_CUDA_GRAPH_OPT:-1}
+    volumes:
+      # Shared models path is mounted by multiple services in this stack, so we keep :z
+      # (shared SELinux label). Use :Z only for service-private model directories.
+      - ${STACK2_LLAMA_MODELS_PATH:?STACK2_LLAMA_MODELS_PATH not set}:/models:ro,z
+    # Speed-first (Gemma4 MoE): mmap, f16 KV, n-cpu-moe=0, flash-attn. Контекст (-c) не передаём — auto-fit из GGUF.
+    # E4B vision: mmproj-BF16.gguf; dense 31B/26B без mmproj — LLAMA_CHAT_MMPROJ_FILE= в .env.stack2 отключает (--no-mmproj).
+    command:
+      - -m
+      - /models/${LLAMA_CHAT_FILE:?LLAMA_CHAT_FILE not set}
+      - --mmproj
+      - /models/${LLAMA_CHAT_MMPROJ_FILE:-mmproj-BF16.gguf}
+      - --image-max-tokens
+      - "${LLAMA_CHAT_IMAGE_MAX_TOKENS:-512}"
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8080"
+      - --cache-ram
+      - "${LLAMA_CHAT_CACHE_RAM_MIB:-2048}"
+      - --parallel
+      - "${LLAMA_CHAT_PARALLEL:-1}"
+      # 999 = все слои на GPU. tool-router — CPU (профиль companion-tool-router), не делит VRAM чата.
+      - -ngl
+      - "${LLAMA_CHAT_NGL:-999}"
+      - -ncmoe
+      - "${LLAMA_CHAT_N_CPU_MOE:-0}"
+      - --flash-attn
+      - "${LLAMA_CHAT_FLASH_ATTN:-on}"
+      - --cache-type-k
+      - "${LLAMA_CHAT_CACHE_TYPE_K:-f16}"
+      - --cache-type-v
+      - "${LLAMA_CHAT_CACHE_TYPE_V:-f16}"
+      - -b
+      - "${LLAMA_CHAT_BATCH:-512}"
+      - -ub
+      - "${LLAMA_CHAT_UBATCH:-512}"
+      - --reasoning
+      - "${LLAMA_CHAT_REASONING:-off}"
+      - --temp
+      - "${LLAMA_CHAT_TEMP:-0.7}"
+      - --top-p
+      - "${LLAMA_CHAT_TOP_P:-0.8}"
+      - --top-k
+      - "${LLAMA_CHAT_TOP_K:-20}"
+      - --min-p
+      - "${LLAMA_CHAT_MIN_P:-0.0}"
+      - --presence-penalty
+      - "${LLAMA_CHAT_PRESENCE_PENALTY:-0.0}"
+      - --repeat-penalty
+      - "${LLAMA_CHAT_REPEAT_PENALTY:-1.0}"
+      - --metrics
+    ports:
+      - "${LLAMA_CHAT_CLIENT_BIND:-127.0.0.1}:${LLAMA_CHAT_HOST_PORT:?LLAMA_CHAT_HOST_PORT not set}:8080"
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "150m"
+        max-file: "20"
+    # Сырой TCP (/dev/tcp + echo) даёт не-HTTP трафик → llama-server отвечает 400 и шумит в логах.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf --connect-timeout 4 http://127.0.0.1:8080/health >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+  # EWA companion Tool Router — structured FC (Qwen3-4B) на **CPU** (не делит VRAM с chat/embed/rerank).
+  # docker compose -f docker/stack/stack2.yml --env-file docker/env_file/.env.stack2 --profile companion-tool-router up -d llama-tool-router
+  llama-tool-router:
+    profiles: [companion-tool-router]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: stack2-llama-tool-router
+    networks:
+      - ew_net_4532
+      - ew_net_2847
+    user: "${STACK2_LLAMA_USER:-0:0}"
+    mem_limit: ${LLAMA_TOOL_ROUTER_MEM_LIMIT:-8G}
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=Asia/Vladivostok
+    volumes:
+      - ${STACK2_LLAMA_MODELS_PATH:?STACK2_LLAMA_MODELS_PATH not set}:/models:ro,z
+    command:
+      - -m
+      - /models/${LLAMA_TOOL_ROUTER_FILE:?LLAMA_TOOL_ROUTER_FILE not set when profile companion-tool-router is used}
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8080"
+      - -c
+      - "${LLAMA_TOOL_ROUTER_CTX:-4096}"
+      - --parallel
+      - "${LLAMA_TOOL_ROUTER_PARALLEL:-2}"
+      - -ngl
+      - "${LLAMA_TOOL_ROUTER_NGL:-0}"
+      - --jinja
+      - -t
+      - "${LLAMA_TOOL_ROUTER_THREADS:-0}"
+      - -tb
+      - "${LLAMA_TOOL_ROUTER_THREADS_BATCH:-0}"
+    ports:
+      - "${LLAMA_TOOL_ROUTER_CLIENT_BIND:-127.0.0.1}:${LLAMA_TOOL_ROUTER_HOST_PORT:-8088}:8080"
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf --connect-timeout 4 http://127.0.0.1:8080/health >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+
+  # 2. ЭМБЕДДИНГИ — GGUF через llama-server **CUDA** (VRAM); при OOM на одной карте с чатом — снизить LLAMA_EMBED_NGL / LLAMA_EMBED_CTX или вернуть образ `server` (CPU), см. STACK2-LLM-CONTRACT.md.
+  # По умолчанию не поднимается: эмбед на удалённом llama-remote; включить локально — профиль local-stack2-embed-rerank.
+  llama-embed:
+    profiles: [local-stack2-embed-rerank]
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: stack2-llama-embed
+    networks: [ew_net_4532, ew_net_2847]
+    devices:
+      - "nvidia.com/gpu=all"
+    environment:
+      - TZ=${TZ:-Asia/Vladivostok}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+    mem_limit: ${LLAMA_EMBED_MEM_LIMIT:-8G}
+    volumes:
+      # Shared model mount with chat/rerank/tool-router -> :z to avoid MCS conflicts.
+      - ${STACK2_LLAMA_MODELS_PATH}:/models:ro,z
+    command:
+      - "-m"
+      - "/models/${LLAMA_EMBED_FILE}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "--embedding"
+      - "--pooling"
+      - "last"
+      - "-c"
+      - "${LLAMA_EMBED_CTX:-4096}"
+      - "-ub"
+      - "${LLAMA_EMBED_UBATCH:-2048}"
+      - "-ngl"
+      - "${LLAMA_EMBED_NGL:-999}"
+      - "--parallel"
+      - "${LLAMA_EMBED_PARALLEL:-1}"
+    ports:
+      - "${LLAMA_EMBED_CLIENT_BIND:-127.0.0.1}:${LLAMA_EMBED_HOST_PORT}:8080"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+      - label=disable
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf --connect-timeout 4 http://127.0.0.1:8080/health >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  # 2b. ЭМБЕДДИНГИ — HF safetensors на CPU (официальный путь для Qwen3-Embedding-* из model card)
+  # Включается: docker compose ... --profile tei-cpu-embed up -d tei-embed
+  # stack0: LLAMA_EMBEDDING_URL=http://stack2-tei-embed:80 (внутри контейнера TEI слушает :80)
+  tei-embed:
+    image: ghcr.io/huggingface/text-embeddings-inference:${TEI_IMAGE_TAG:-cpu-1.7.2}
+    container_name: stack2-tei-embed
+    profiles: [tei-cpu-embed]
+    networks: [ew_net_4532, ew_net_2847]
+    # Qwen3-Embedding-8B + FP32 + Candle: в memcg считаются anon-RSS + file-RSS (mmap весов с /data). Журнал ядра нередко показывает anon ~25G + file ~6.5G → сумма >30G и OOM при TEI_EMBED_MEM_LIMIT=30G.
+    mem_limit: ${TEI_EMBED_MEM_LIMIT:-36G}
+    volumes:
+      # HF hub cache: bind TEI_HF_HOME (absolute host path) or named volume if TEI_HF_HOME is a short name
+      - ${TEI_HF_HOME:-tei_hf_cache}:/data:z
+    environment:
+      - TZ=${TZ:-Asia/Vladivostok}
+      # Необязательно: для приватных/лимитных реп на HF
+      - HF_TOKEN=${HF_TOKEN:-}
+      # Candle+MKL на CPU: «Parameter … incorrect» на SGEMM/HGEMM — см. TEI_* в .env.stack2
+      - OMP_NUM_THREADS=${TEI_OMP_NUM_THREADS:-1}
+      - MKL_NUM_THREADS=${TEI_MKL_NUM_THREADS:-1}
+      - KMP_DUPLICATE_LIB_OK=${TEI_KMP_DUPLICATE_LIB_OK:-TRUE}
+      - RAYON_NUM_THREADS=${TEI_RAYON_NUM_THREADS:-1}
+      - MKL_DISABLE_FAST_MM=${TEI_MKL_DISABLE_FAST_MM:-1}
+      # Образ TEI по умолчанию может выставлять AVX512_* для MKL — на части CPU даёт «Parameter incorrect» на GEMM; переопределяем через .env.stack2
+      - MKL_ENABLE_INSTRUCTIONS=${TEI_MKL_ENABLE_INSTRUCTIONS:-AVX2}
+      # Меньше workers — меньше RAM при старте (дефолт TEI ≈ число CPU → на 12+ ядрах лишнее для хоста 32G)
+      - TOKENIZATION_WORKERS=${TEI_TOKENIZATION_WORKERS:-4}
+    command:
+      - "--model-id"
+      - "${TEI_EMBED_MODEL_ID:-Qwen/Qwen3-Embedding-8B}"
+      - "--dtype"
+      - "${TEI_EMBED_DTYPE:-float32}"
+    ports:
+      - "127.0.0.1:${TEI_EMBED_HOST_PORT:-8083}:80"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf --connect-timeout 4 http://127.0.0.1:80/health >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+
+  # 3. РЕРАНК — GGUF + llama-server --reranking на **CUDA** (VRAM); при OOM на одной карте с чатом — снизить LLAMA_RERANK_NGL или вынести на llama-remote / CPU fallback (`server`, `-ngl 0`), см. STACK2-LLM-CONTRACT.md.
+  # По умолчанию не поднимается: реранк на удалённом llama-remote; включить локально — профиль local-stack2-embed-rerank.
+  llama-rerank:
+    profiles: [local-stack2-embed-rerank]
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: stack2-llama-rerank
+    networks: [ew_net_4532, ew_net_2847]
+    devices:
+      - "nvidia.com/gpu=all"
+    environment:
+      - TZ=${TZ:-Asia/Vladivostok}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+    mem_limit: ${LLAMA_RERANK_MEM_LIMIT:-16G}
+    volumes:
+      - ${STACK2_LLAMA_MODELS_PATH}:/models:ro,z
+    command:
+      - "-m"
+      - "/models/${LLAMA_RERANK_FILE}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "--reranking"
+      - "-c"
+      - "${LLAMA_RERANK_CTX:-8192}"
+      # Дефолт llama-server --ubatch-size=512: промпт query+doc у Qwen3-Reranker часто >512 токенов → 500 «increase the physical batch size»
+      - "-ub"
+      - "${LLAMA_RERANK_UBATCH:-2048}"
+      - "-ngl"
+      - "${LLAMA_RERANK_NGL:-32}"
+    ports:
+      - "${LLAMA_RERANK_CLIENT_BIND:-127.0.0.1}:${LLAMA_RERANK_HOST_PORT}:8080"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+      - label=disable
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf --connect-timeout 4 http://127.0.0.1:8080/health >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s

@@ -1,0 +1,135 @@
+{
+  "$id": "iacpack.schemas.policy.v1",
+  "title": "iacpack compile policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "iacpack.policy/v1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "CompilePolicy"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registries", "capabilities", "quotas"],
+      "properties": {
+        "registries": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allow"],
+          "properties": {
+            "allow": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "developmentBuilds",
+            "buildNetwork",
+            "externalNetworks",
+            "externalVolumes",
+            "includeRuntime",
+            "embedImages"
+          ],
+          "properties": {
+            "developmentBuilds": {
+              "type": "boolean"
+            },
+            "buildNetwork": {
+              "type": "boolean"
+            },
+            "externalNetworks": {
+              "type": "boolean"
+            },
+            "externalVolumes": {
+              "type": "boolean"
+            },
+            "includeRuntime": {
+              "type": "boolean"
+            },
+            "embedImages": {
+              "type": "boolean"
+            }
+          }
+        },
+        "quotas": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "maxEntries",
+            "maxEntryBytes",
+            "maxExpandedBytes",
+            "maxCompressionRatio",
+            "maxPathBytes"
+          ],
+          "properties": {
+            "maxEntries": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maxEntryBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 107374182400
+            },
+            "maxExpandedBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 107374182400
+            },
+            "maxCompressionRatio": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "maxPathBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 255
+            }
+          }
+        },
+        "resourceCeilings": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cpus": {
+              "type": "string"
+            },
+            "memoryBytes": {
+              "type": "integer",
+              "minimum": 1048576,
+              "maximum": 1099511627776
+            }
+          }
+        }
+      }
+    }
+  }
+}

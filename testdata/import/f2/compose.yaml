@@ -1,0 +1,22 @@
+# ADR-020 F2: profiles + partial propose (policy warnings must not block ok).
+name: f2
+
+networks:
+  net:
+    driver: bridge
+
+services:
+  web:
+    image: docker.io/library/nginx:1.27
+    networks: [net]
+
+  debug:
+    profiles: [debug]
+    image: docker.io/library/alpine:3.20
+    networks: [net]
+
+  gpu:
+    image: docker.io/library/alpine:3.20
+    devices:
+      - "nvidia.com/gpu=all"
+    networks: [net]

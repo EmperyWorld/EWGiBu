@@ -1,0 +1,43 @@
+{
+  "$id": "iacpack.schemas.cli.v1.build",
+  "title": "iacpack build command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "build"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["output", "format", "preview", "files"],
+          "properties": {
+            "output": { "type": "string", "minLength": 1 },
+            "format": { "type": "string", "enum": ["directory", "bundle"] },
+            "preview": { "type": "boolean" },
+            "files": { "type": "integer", "minimum": 0 },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "iacpack.schemas.cli.v1.diagnostics"
+      }
+    }
+  }
+}

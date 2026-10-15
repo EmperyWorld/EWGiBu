@@ -1,0 +1,154 @@
+# =============================================================================
+# EliteEW · stack6 — Keycloak + Postgres (OIDC)
+# =============================================================================
+# Запуск: docker compose -f docker/stack/stack6.yml --env-file docker/env_file/.env.stack6 up -d
+#
+# Секреты только из env-файла. Ошибка «password authentication failed for user keycloak»:
+# KEYCLOAK_DB_PASSWORD должен совпадать с первичной инициализацией тома БД либо сбросить пароль вручную (KEYCLOAK-ELITEEW.md).
+# KC health: TCP 8080 (bash /dev/tcp в образе без curl).
+# =============================================================================
+name: stack6
+
+networks:
+  ew_net_9O11:
+    external: true
+
+services:
+  keycloak-postgres:
+    image: docker.io/library/postgres:18.4-alpine
+    container_name: stack6-keycloak-postgres
+    user: "${STACK6_KEYCLOAK_POSTGRES_USER:?STACK6_KEYCLOAK_POSTGRES_USER not set}"
+    networks: [ew_net_9O11]
+    security_opt:
+      - no-new-privileges:true
+    # log_timezone через -c: иначе в строках лога будет «UTC», хотя TZ=Asia/Vladivostok (как stack1-postgres).
+    command:
+      - postgres
+      - -c
+      - timezone=Asia/Vladivostok
+      - -c
+      - log_timezone=Asia/Vladivostok
+    environment:
+      TZ: Asia/Vladivostok
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD not set}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ../data/stack6/keycloak-postgres:/var/lib/postgresql/data:z
+      - ../logs/stack6/keycloak-postgres:/logs:z
+    ports:
+      - "127.0.0.1:${KEYCLOAK_POSTGRES_HOST_PORT:?KEYCLOAK_POSTGRES_HOST_PORT not set}:5432"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 60s         # Было 5s — увеличиваем до 60 секунд
+      timeout: 10s         # Даем больше времени на ответ
+      retries: 3           # Уменьшаем количество повторов с 5 до 3
+      start_period: 30s    # Даем базе 30 секунд на запуск до первой проверки
+
+
+
+
+
+  keycloak:
+    # Default pin: official 26.7.1. Baked SPI image: STACK6_KEYCLOAK_IMAGE + stack6.prod-baked.override.yml.
+    # Never podman build this image on prod-core .111.
+    image: ${STACK6_KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.7.1}
+    container_name: stack6-keycloak
+    # Образ: пользователь keycloak = UID 1000, GID 0; явно задаём 1000:0 (не root, группа как в образе)
+    user: "${STACK6_KEYCLOAK_USER:?STACK6_KEYCLOAK_USER not set}"
+    networks: [ew_net_9O11]
+    security_opt:
+      - no-new-privileges:true
+    command: start
+    environment:
+      TZ: Asia/Vladivostok
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://stack6-keycloak-postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD not set}
+
+      # Логин: KEYCLOAK_ADMIN или KEYCLOAK_ADMIN_USER (как в EliteEW API).
+      # ВАЖНО: bootstrap применяется только при первом запуске (пустая БД). Смена пароля в .env
+      # потом не обновляет админа в БД. Восстановление: docker/scripts/keycloak-bootstrap-admin-recover.sh
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?KEYCLOAK_ADMIN not set}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD not set}
+
+      # КРИТИЧНО для работы за прокси! Auth и Admin — один hostname, иначе Admin UI крутится
+      # "Loading..." (часть запросов идёт на KC_HOSTNAME, часть на KC_HOSTNAME_ADMIN → зависание).
+      # В Keycloak 26+ сюда нужны полные URL: https://auth.example.com (не только host).
+      KC_HOSTNAME: ${KC_HOSTNAME:?KC_HOSTNAME not set}
+      KC_HOSTNAME_ADMIN: ${KC_HOSTNAME_ADMIN:?KC_HOSTNAME_ADMIN not set}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+
+      # Proxy (Keycloak 26+): KC_PROXY_HEADERS вместо устаревшего KC_PROXY=edge
+      KC_PROXY_HEADERS: xforwarded
+      # По умолчанию: все частные диапазоны RFC1918 + loopback — чтобы nginx на хосте
+      # (`host-gateway` → произвольный 172.xx bridge) и туннель Yandex были «trusted proxies» для X-Forwarded-*.
+      # Сузьте до конкретных IP/CIDR вашего nginx только если инфраструктура зафиксирована — через KC_PROXY_TRUSTED_ADDRESSES в env.
+      KC_PROXY_TRUSTED_ADDRESSES: ${KC_PROXY_TRUSTED_ADDRESSES:-127.0.0.0/8,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: 8080
+
+      # Features (management :9000 наружу не пробрасываем)
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+
+      # Single-node prod: local Infinispan — no JDBC_PING/JGroups join to stale peers after recreate.
+      # For HA multi-replica Keycloak, switch to ispn and document cluster topology explicitly.
+      KC_CACHE: local
+
+      # Logging (console + file on host in docker/logs/stack6/keycloak)
+      KC_LOG_LEVEL: INFO
+      KC_LOG: console,file
+      KC_LOG_FILE: /logs/keycloak.log
+
+      # Build-time (kc.sh build). Runtime env is ignored on `start --optimized`
+      # unless the baked image persisted the same value. Default Keycloak 26 = false.
+      KC_TRANSACTION_XA_ENABLED: "false"
+
+      # Wave 3 binding SPI (used only when the provider JAR is in the image and the flow is attached).
+      # Empty SPI token → SPI fail-closed. Do not put the token in git.
+      ELITEEW_BINDING_API_BASE_URL: ${ELITEEW_BINDING_API_BASE_URL:-https://app.eliteew.ru/api/v1/desktop-client}
+      DESKTOP_CLIENT_BINDING_SPI_TOKEN: ${DESKTOP_CLIENT_BINDING_SPI_TOKEN:-}
+
+    volumes:
+      - ../logs/stack6/keycloak:/logs:z
+      # Custom login themes are repo-controlled and mounted read-only; do not edit bundled Keycloak themes.
+      - ../keycloak/themes:/opt/keycloak/themes:z,ro
+    # 127.0.0.1 — только локальный хост; LAN/bridge proxies need KEYCLOAK_HOST_BIND=0.0.0.0.
+    ports:
+      - "${KEYCLOAK_HOST_BIND:-127.0.0.1}:${KEYCLOAK_HOST_PORT:?KEYCLOAK_HOST_PORT not set}:8080"
+    depends_on:
+      keycloak-postgres:
+        condition: service_started # Замени healthy на started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+    # Keycloak 26+: образ без `nc`; проверяем TCP :8080 через bash /dev/tcp (иначе статус «unhealthy» при живом KC).
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s

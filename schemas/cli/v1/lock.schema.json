@@ -1,0 +1,40 @@
+{
+  "$id": "iacpack.schemas.cli.v1.lock",
+  "title": "iacpack lock command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "lock"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lock", "inputs"],
+          "properties": {
+            "lock": { "type": "string", "minLength": 1 },
+            "inputs": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "iacpack.schemas.cli.v1.diagnostics"
+      }
+    }
+  }
+}

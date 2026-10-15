@@ -1,0 +1,64 @@
+{
+  "$id": "iacpack.schemas.cli.v1.import_stub_preview",
+  "title": "iacpack import stub-preview command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "import stub-preview"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plannedDirs", "plannedFiles", "plannedBuildContexts", "skipped", "bindItems"],
+      "properties": {
+        "plannedDirs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "plannedFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "plannedBuildContexts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "skipped": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "bindItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["missingPath", "kind", "status"],
+            "properties": {
+              "resourceId": { "type": "string" },
+              "imageId": { "type": "string" },
+              "missingPath": { "type": "string" },
+              "kind": { "type": "string" },
+              "source": { "type": "string" },
+              "include": { "type": "string" },
+              "status": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "iacpack.schemas.cli.v1.diagnostics" }
+    }
+  }
+}

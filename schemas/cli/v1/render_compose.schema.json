@@ -1,0 +1,44 @@
+{
+  "$id": "iacpack.schemas.cli.v1.render_compose",
+  "title": "iacpack render compose command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "render compose"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bundle", "format", "bytes", "output", "project", "semanticHash"],
+          "properties": {
+            "bundle": { "type": "string" },
+            "format": { "type": "string", "const": "compose" },
+            "bytes": { "type": "integer", "minimum": 0 },
+            "output": { "type": "string" },
+            "project": { "type": "string" },
+            "semanticHash": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "iacpack.schemas.cli.v1.diagnostics"
+      }
+    }
+  }
+}

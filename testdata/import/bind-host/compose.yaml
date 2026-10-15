@@ -1,0 +1,7 @@
+services:
+  bad:
+    image: docker.io/library/nginx@sha256:0000000000000000000000000000000000000000000000000000000000000001
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock

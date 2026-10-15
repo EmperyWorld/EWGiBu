@@ -1,0 +1,58 @@
+# =============================================================================
+# EliteEW · EWA Postgres — отдельный инстанс под оркестрацию EWA (не путать с DATABASE_URL приложения)
+# =============================================================================
+# Данные: ../data/ewa/postgresql
+# Запуск: docker compose -f docker/stack/stack-ewa-postgres.yml --env-file docker/env_file/.env.stack-ewa up -d
+# Пример env: docker/env_file/.env.stack-ewa.example
+#
+# DSN в API: EWA_DATABASE_URL=postgresql://USER:PASS@stack-ewa-postgres:5432/DB
+# LAN workers (.141): EWA_POSTGRES_CLIENT_BIND=192.168.1.136 + firewalld tcp/30433
+# В healthcheck используйте $$ в compose, чтобы не съедались переменные POSTGRES_* (см. EWA-POSTGRES-RUNBOOK.md).
+# =============================================================================
+name: stack-ewa-postgres
+
+networks:
+  ew_net_2847:
+    external: true
+
+services:
+  stack-ewa-postgres:
+    image: docker.io/library/postgres:18.4
+    container_name: stack-ewa-postgres
+    networks: [ew_net_2847]
+    user: "${EWA_PG_UID:?EWA_PG_UID not set}"
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - postgres
+      - -c
+      - timezone=Asia/Vladivostok
+      - -c
+      - log_timezone=Asia/Vladivostok
+    environment:
+      TZ: "${EWA_PG_TZ:-Asia/Vladivostok}"
+      POSTGRES_DB: "${EWA_POSTGRES_DB:?EWA_POSTGRES_DB not set}"
+      POSTGRES_USER: "${EWA_POSTGRES_USER:?EWA_POSTGRES_USER not set}"
+      POSTGRES_PASSWORD: "${EWA_POSTGRES_PASSWORD:?EWA_POSTGRES_PASSWORD not set}"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ../data/ewa/postgresql:/var/lib/postgresql/data:z
+    ports:
+      - "${EWA_POSTGRES_CLIENT_BIND:-127.0.0.1}:${EWA_POSTGRES_HOST_PORT:?EWA_POSTGRES_HOST_PORT not set}:5432"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    # Use ``$$`` so Compose does not strip ``$POSTGRES_*`` (host has no such vars); container shell expands them.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -p 5432 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\"",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s

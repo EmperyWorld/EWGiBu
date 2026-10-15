@@ -1,0 +1,13 @@
+# Переопределение production: добавляем запись логов в /logs/qdrant.log
+log_level: INFO
+
+service:
+  host: 0.0.0.0
+  http_port: 6333
+  grpc_port: 6334
+
+logger:
+  on_disk:
+    enabled: true
+    log_file: /logs/qdrant.log
+    log_level: info

@@ -1,0 +1,27 @@
+apiVersion: iacpack.io/v1alpha1
+kind: Project
+metadata:
+  name: example
+  version: 0.1.0
+spec:
+  target:
+    profile: compose-docker/v1
+  mode: development
+  images:
+    app:
+      build:
+        context: app
+        dockerfile: Dockerfile
+        include: ["**"]
+        expectedImageID: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  services:
+    app:
+      image: app
+  tasks:
+    warmup:
+      phase: preStart
+      image: app
+      command: ["/app/warmup"]
+      dependsOn:
+        - target: app
+          condition: started

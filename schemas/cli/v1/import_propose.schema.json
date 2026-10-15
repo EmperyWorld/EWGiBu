@@ -1,0 +1,125 @@
+{
+  "$id": "iacpack.schemas.cli.v1.import_propose",
+  "title": "iacpack import propose command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "import propose"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project",
+        "summary",
+        "sources",
+        "refusals",
+        "parameterGaps",
+        "secretSuggestions",
+        "envExample"
+      ],
+      "properties": {
+        "project": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "object" }
+          ]
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["services", "images", "networks", "volumes", "resources", "parameters"],
+          "properties": {
+            "services": { "type": "integer", "minimum": 0 },
+            "images": { "type": "integer", "minimum": 0 },
+            "networks": { "type": "integer", "minimum": 0 },
+            "volumes": { "type": "integer", "minimum": 0 },
+            "resources": { "type": "integer", "minimum": 0 },
+            "parameters": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "sources": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "refusals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "code", "category", "message"],
+            "properties": {
+              "path": { "type": "string" },
+              "pointer": { "type": "string" },
+              "code": { "type": "string", "minLength": 1 },
+              "category": {
+                "type": "string",
+                "enum": ["policy", "unsupported", "secret", "path", "collision"]
+              },
+              "message": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "parameterGaps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "phase", "type", "reason"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "phase": { "type": "string", "enum": ["build", "deploy"] },
+              "type": {
+                "type": "string",
+                "enum": ["string", "integer", "number", "boolean", "enum"]
+              },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "secretSuggestions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "source", "path"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "source": {
+                "type": "string",
+                "enum": ["env_file", "env_key", "compose_secret"]
+              },
+              "path": { "type": "string" },
+              "pointer": { "type": "string" },
+              "envFile": { "type": "string" },
+              "envKey": { "type": "string" },
+              "service": { "type": "string" },
+              "target": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "envExample": {
+          "type": "string",
+          "description": "Placeholder-only .env.example preview; never contains secret values"
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "iacpack.schemas.cli.v1.diagnostics"
+      }
+    }
+  }
+}

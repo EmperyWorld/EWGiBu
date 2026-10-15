@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "iacpack.cli/v1",
+  "command": "version",
+  "ok": true,
+  "result": {
+    "product": "iacpack",
+    "version": "1.1.0",
+    "goVersion": "REPLACE_AT_RUNTIME",
+    "commit": "unknown",
+    "dirty": false
+  },
+  "diagnostics": []
+}

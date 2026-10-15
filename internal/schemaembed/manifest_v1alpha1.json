@@ -1,0 +1,1055 @@
+{
+  "$id": "iacpack.schemas.manifest.v1alpha1",
+  "title": "iacpack Project manifest v1alpha1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "iacpack.io/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "Project"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "version": {
+          "type": "string",
+          "description": "SemVer without a leading v",
+          "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "mode", "images", "services"],
+      "properties": {
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profile"],
+          "properties": {
+            "profile": {
+              "type": "string",
+              "const": "compose-docker/v1"
+            }
+          }
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["development", "release"]
+        },
+        "parameters": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/parameter"
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/secret"
+          }
+        },
+        "images": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/image"
+          }
+        },
+        "builds": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/packageBuild"
+          }
+        },
+        "resources": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/resource"
+          }
+        },
+        "networks": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/network"
+          }
+        },
+        "volumes": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/volume"
+          }
+        },
+        "services": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 500,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/service"
+          }
+        },
+        "tasks": {
+          "type": "object",
+          "maxProperties": 500,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/task"
+          }
+        },
+        "databases": {
+          "type": "object",
+          "maxProperties": 100,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/database"
+          },
+          "description": "Extra databases on an existing server service. Lock and compile emit one migration task each."
+        },
+        "package": {
+          "$ref": "#/$defs/package"
+        },
+        "x-ui": {
+          "$ref": "#/$defs/xui"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "duration": {
+      "type": "string",
+      "pattern": "^([1-9]\\d*)(ms|s|m|h)$",
+      "description": "ASCII decimal + ms|s|m|h; >0 and <=24h enforced in semantic validation"
+    },
+    "workspacePath": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Relative workspace path; lexical rules enforced in domain validation"
+    },
+    "containerPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^/",
+      "description": "Absolute POSIX container path"
+    },
+    "valueSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": ["literal"],
+          "properties": {
+            "literal": {
+              "type": ["string", "number", "integer", "boolean"]
+            }
+          }
+        },
+        {
+          "required": ["parameter"],
+          "properties": {
+            "parameter": {
+              "$ref": "#/$defs/identifier"
+            }
+          }
+        },
+        {
+          "required": ["secret"],
+          "properties": {
+            "secret": {
+              "$ref": "#/$defs/identifier"
+            }
+          }
+        },
+        {
+          "required": ["parts"],
+          "properties": {
+            "parts": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "oneOf": [
+                  {
+                    "required": ["literal"],
+                    "properties": {
+                      "literal": { "type": ["string", "number", "integer", "boolean"] }
+                    }
+                  },
+                  {
+                    "required": ["parameter"],
+                    "properties": {
+                      "parameter": { "$ref": "#/$defs/identifier" }
+                    }
+                  },
+                  {
+                    "required": ["secret"],
+                    "properties": {
+                      "secret": { "$ref": "#/$defs/identifier" }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "argv": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["literal"],
+            "properties": {
+              "literal": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["secret"],
+            "properties": {
+              "secret": {
+                "$ref": "#/$defs/identifier"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["parts"],
+            "properties": {
+              "parts": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["parameter"],
+                      "properties": {
+                        "parameter": {
+                          "$ref": "#/$defs/identifier"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["secret"],
+                      "properties": {
+                        "secret": {
+                          "$ref": "#/$defs/identifier"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "type"],
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": ["build", "deploy"]
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "integer", "number", "boolean", "enum"]
+        },
+        "default": {
+          "type": ["string", "number", "integer", "boolean"]
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "pattern": {
+          "type": "string",
+          "maxLength": 1024,
+          "description": "RE2 pattern; length <= 1 KiB"
+        },
+        "choices": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": ["string", "number", "integer", "boolean"]
+          }
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      }
+    },
+    "secret": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "delivery": {
+          "type": "string",
+          "const": "file",
+          "default": "file"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      }
+    },
+    "image": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref", "delivery"],
+          "properties": {
+            "ref": {
+              "description": "Pull ref string, or {parameter: id} when the image has no default yet",
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["parameter"],
+                  "properties": {
+                    "parameter": {
+                      "$ref": "#/$defs/identifier"
+                    }
+                  }
+                }
+              ]
+            },
+            "delivery": {
+              "type": "string",
+              "const": "pull"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["build"],
+          "properties": {
+            "build": {
+              "$ref": "#/$defs/imageBuild"
+            }
+          }
+        }
+      ]
+    },
+    "packageBuild": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context", "packageManager", "install", "script", "output"],
+      "properties": {
+        "context": { "$ref": "#/$defs/workspacePath" },
+        "packageManager": { "type": "string", "enum": ["pnpm", "npm", "yarn", "bun"] },
+        "install": { "type": "string", "enum": ["frozen"] },
+        "script": { "type": "string", "pattern": "^[A-Za-z0-9:_-]{1,64}$" },
+        "output": { "type": "string", "minLength": 1, "pattern": "^[^\\\\]*$" },
+        "entry": { "type": "string", "minLength": 1, "default": "index.html" }
+      }
+    },
+    "imageBuild": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context", "dockerfile", "include"],
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/workspacePath"
+        },
+        "dockerfile": {
+          "$ref": "#/$defs/workspacePath"
+        },
+        "include": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "args": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/valueSource"
+          },
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          }
+        },
+        "expectedImageID": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "include"],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/workspacePath"
+        },
+        "include": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "destination": {
+          "type": "string",
+          "minLength": 1,
+          "description": "BundlePath lexical form"
+        },
+        "mode": {
+          "type": "string",
+          "pattern": "^0[0-7]{3}$"
+        },
+        "allowEmpty": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "externalRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "network": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["external"],
+          "properties": {
+            "external": {
+              "$ref": "#/$defs/externalRef"
+            }
+          }
+        }
+      ]
+    },
+    "volume": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "retention": {
+              "type": "string",
+              "enum": ["retain", "delete"],
+              "default": "retain"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["external"],
+          "properties": {
+            "external": {
+              "$ref": "#/$defs/externalRef"
+            }
+          }
+        }
+      ]
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["container"],
+      "properties": {
+        "container": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "host": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            {
+              "$ref": "#/$defs/valueSource"
+            }
+          ]
+        },
+        "bind": {
+          "type": "string",
+          "minLength": 1,
+          "description": "IP literal only"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["tcp", "udp"],
+          "default": "tcp"
+        }
+      }
+    },
+    "secretMount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "target"],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/identifier"
+        },
+        "target": {
+          "$ref": "#/$defs/containerPath"
+        }
+      }
+    },
+    "mount": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["volume", "target"],
+          "properties": {
+            "volume": {
+              "$ref": "#/$defs/identifier"
+            },
+            "target": {
+              "$ref": "#/$defs/containerPath"
+            },
+            "readOnly": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resource", "target"],
+          "properties": {
+            "resource": {
+              "$ref": "#/$defs/identifier"
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1
+            },
+            "target": {
+              "$ref": "#/$defs/containerPath"
+            },
+            "readOnly": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["host", "target"],
+          "description": "External host bind. The directory stays on the host and is not a bundle input.",
+          "properties": {
+            "host": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["parameter"],
+                  "properties": {
+                    "parameter": {
+                      "$ref": "#/$defs/identifier"
+                    }
+                  }
+                }
+              ]
+            },
+            "target": {
+              "$ref": "#/$defs/containerPath"
+            },
+            "readOnly": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["build", "target"],
+          "description": "Mount of a package-manager build output produced by iacpack build.",
+          "properties": {
+            "build": {
+              "$ref": "#/$defs/identifier"
+            },
+            "target": {
+              "$ref": "#/$defs/containerPath"
+            },
+            "readOnly": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        }
+      ]
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "condition"],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/identifier"
+        },
+        "condition": {
+          "type": "string",
+          "enum": ["started", "healthy", "completedSuccessfully"]
+        }
+      }
+    },
+    "healthcheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "interval", "timeout", "retries"],
+      "properties": {
+        "command": {
+          "$ref": "#/$defs/argv"
+        },
+        "interval": {
+          "$ref": "#/$defs/duration"
+        },
+        "timeout": {
+          "$ref": "#/$defs/duration"
+        },
+        "startPeriod": {
+          "$ref": "#/$defs/duration"
+        },
+        "retries": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "resourceLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpus": {
+          "type": "string",
+          "pattern": "^(0\\.(00[1-9]|0[1-9]\\d|[1-9]\\d{0,2})|[1-9]\\d{0,3}|10[0-1]\\d|102[0-4])$",
+          "description": "Decimal string 0.001..1024"
+        },
+        "memory": {
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 1099511627776,
+          "description": "Integer bytes 1 MiB .. 1 TiB"
+        },
+        "gpu": {
+          "description": "NVIDIA GPU count 1..8, or the string all (ADR-021). Not CDI device paths.",
+          "oneOf": [
+            { "type": "integer", "minimum": 1, "maximum": 8 },
+            { "type": "string", "const": "all" },
+            { "type": "string", "const": "devices-only" }
+          ]
+        },
+        "ldLibraryPath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^/[^\\s]+$",
+          "description": "Container directory of libcuda when gpu is devices-only. CDI is not required."
+        }
+      }
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0
+        },
+        "initialBackoff": {
+          "$ref": "#/$defs/duration"
+        },
+        "multiplier": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "maxBackoff": {
+          "$ref": "#/$defs/duration"
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["on", "name", "ownerFrom", "migrations", "urlParameter"],
+      "properties": {
+        "on": {
+          "$ref": "#/$defs/identifier",
+          "description": "Service id of the existing database server."
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$"
+        },
+        "ownerFrom": {
+          "$ref": "#/$defs/identifier",
+          "description": "Service whose POSTGRES_USER and POSTGRES_PASSWORD are reused."
+        },
+        "migrations": {
+          "$ref": "#/$defs/workspacePath"
+        },
+        "urlParameter": {
+          "$ref": "#/$defs/identifier",
+          "description": "Deploy parameter expanded to the DSN. The password stays a secret reference."
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image"],
+      "properties": {
+        "image": {
+          "$ref": "#/$defs/identifier"
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*$|^[0-9]+$|^[0-9]+:[0-9]+$",
+          "description": "Container user as a uid, uid:gid, or name. Empty leaves the image USER."
+        },
+        "command": {
+          "$ref": "#/$defs/argv"
+        },
+        "entrypoint": {
+          "$ref": "#/$defs/argv"
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/valueSource"
+          },
+          "propertyNames": {
+            "minLength": 1
+          }
+        },
+        "environmentFrom": {
+          "$ref": "#/$defs/identifier",
+          "description": "Copy this service's environment, then apply environment overrides."
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/secretMount"
+          }
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/port"
+          }
+        },
+        "mounts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mount"
+          }
+        },
+        "networks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "profiles": {
+          "type": "array",
+          "maxItems": 16,
+          "description": "Compose profiles to emit. Import stores them when the service is included.",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$"
+          }
+        },
+        "healthcheck": {
+          "$ref": "#/$defs/healthcheck"
+        },
+        "restart": {
+          "type": "string",
+          "enum": ["no", "always", "on-failure", "unless-stopped"],
+          "default": "unless-stopped"
+        },
+        "resources": {
+          "$ref": "#/$defs/resourceLimits"
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dependency"
+          }
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "image", "command"],
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": ["preStart", "migration", "postDeploy"]
+        },
+        "image": {
+          "$ref": "#/$defs/identifier"
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*$|^[0-9]+$|^[0-9]+:[0-9]+$",
+          "description": "Container user as a uid, uid:gid, or name. Empty leaves the image USER."
+        },
+        "command": {
+          "$ref": "#/$defs/argv"
+        },
+        "entrypoint": {
+          "description": "Replaces the image ENTRYPOINT. An empty array clears it so command is the executable.",
+          "oneOf": [
+            { "type": "array", "maxItems": 0 },
+            { "$ref": "#/$defs/argv" }
+          ]
+        },
+        "workdir": {
+          "$ref": "#/$defs/containerPath"
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dependency"
+          }
+        },
+        "timeout": {
+          "$ref": "#/$defs/duration"
+        },
+        "retry": {
+          "$ref": "#/$defs/retry"
+        },
+        "rerun": {
+          "type": "string",
+          "enum": ["always", "oncePerDeployment", "manual"],
+          "default": "oncePerDeployment"
+        },
+        "mounts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mount"
+          }
+        },
+        "networks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/secretMount"
+          }
+        }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "generateReadme": {
+          "type": "boolean",
+          "default": true
+        },
+        "generateEnvExample": {
+          "type": "boolean",
+          "default": true
+        },
+        "includeRuntime": {
+          "type": "boolean",
+          "default": false
+        },
+        "embedImages": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "xui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y"],
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "category": {
+                "type": "string",
+                "enum": ["app", "database", "proxy", "cache", "custom"]
+              }
+            }
+          }
+        },
+        "viewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "zoom"],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "zoom": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 4
+            }
+          }
+        }
+      }
+    }
+  }
+}

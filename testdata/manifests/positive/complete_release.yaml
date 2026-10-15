@@ -1,0 +1,130 @@
+apiVersion: iacpack.io/v1alpha1
+kind: Project
+metadata:
+  name: acme-shop
+  version: 1.4.0
+  description: Acme Shop deployment
+spec:
+  target:
+    profile: compose-docker/v1
+  mode: release
+  parameters:
+    http-port:
+      phase: deploy
+      type: integer
+      default: 8080
+      minimum: 1
+      maximum: 65535
+      description: Loopback HTTP port
+    db-user:
+      phase: deploy
+      type: string
+      default: acme
+  secrets:
+    db-password:
+      required: true
+      delivery: file
+      description: Database password
+  images:
+    app:
+      ref: ghcr.io/acme/shop@sha256:1111111111111111111111111111111111111111111111111111111111111111
+      delivery: pull
+    postgres:
+      ref: docker.io/library/postgres@sha256:2222222222222222222222222222222222222222222222222222222222222222
+      delivery: pull
+  resources:
+    app-config:
+      source: config
+      include:
+        - app.yaml
+      destination: config
+      mode: "0644"
+  networks:
+    backend:
+  volumes:
+    db-data:
+      retention: retain
+  services:
+    db:
+      image: postgres
+      environment:
+        POSTGRES_DB:
+          literal: acme
+        POSTGRES_USER:
+          parameter: db-user
+        POSTGRES_PASSWORD_FILE:
+          literal: /run/secrets/db-password
+      secrets:
+        - ref: db-password
+          target: /run/secrets/db-password
+      mounts:
+        - volume: db-data
+          target: /var/lib/postgresql/data
+      networks:
+        - backend
+      healthcheck:
+        command:
+          - pg_isready
+          - -U
+          - acme
+        interval: 5s
+        timeout: 3s
+        retries: 20
+    app:
+      image: app
+      dependsOn:
+        - target: db
+          condition: healthy
+      ports:
+        - container: 8080
+          host:
+            parameter: http-port
+          bind: 127.0.0.1
+          protocol: tcp
+      mounts:
+        - resource: app-config
+          source: app.yaml
+          target: /etc/acme/app.yaml
+          readOnly: true
+      networks:
+        - backend
+      healthcheck:
+        command:
+          - /app/healthcheck
+        interval: 5s
+        timeout: 3s
+        retries: 20
+      restart: unless-stopped
+      resources:
+        cpus: "1"
+        memory: 268435456
+  tasks:
+    migrate:
+      phase: migration
+      image: app
+      command:
+        - /app/migrate
+      dependsOn:
+        - target: db
+          condition: healthy
+      rerun: oncePerDeployment
+      timeout: 5m
+  package:
+    includeRuntime: false
+    embedImages: false
+    generateReadme: true
+    generateEnvExample: true
+  x-ui:
+    nodes:
+      app:
+        x: 480
+        y: 120
+        category: app
+      db:
+        x: 120
+        y: 120
+        category: database
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1

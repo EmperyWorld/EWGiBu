@@ -1,0 +1,72 @@
+{
+  "$id": "iacpack.schemas.cli.v1.inspect_inputs",
+  "title": "iacpack inspect inputs JSON envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "inspect inputs"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["inputs", "buildParameters", "images", "policy"],
+          "properties": {
+            "inputs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path", "size", "mode", "sha256", "source"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "size": { "type": "integer" },
+                  "mode": { "type": "string" },
+                  "sha256": { "type": "string" },
+                  "source": { "type": "string" }
+                }
+              }
+            },
+            "buildParameters": { "type": "object" },
+            "images": { "type": "object" },
+            "policy": {
+              "type": "object",
+              "required": ["name", "sha256"],
+              "properties": {
+                "name": { "type": "string" },
+                "sha256": { "type": "string" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "severity", "message", "retryable"],
+        "additionalProperties": false,
+        "properties": {
+          "code": { "type": "string" },
+          "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+          "message": { "type": "string" },
+          "hint": { "type": "string" },
+          "retryable": { "type": "boolean" },
+          "source": { "type": "object" }
+        }
+      }
+    }
+  }
+}

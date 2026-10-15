@@ -1,0 +1,32 @@
+{
+  "$id": "iacpack.schemas.cli.v1.import_write_draft",
+  "title": "iacpack import write-draft command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "import write-draft"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string" }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "iacpack.schemas.cli.v1.diagnostics" }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+services:
+  api:
+    image: docker.io/library/nginx@sha256:0000000000000000000000000000000000000000000000000000000000000001
+    environment:
+      HOST: "${PUBLIC_HOST}"
+      DB_PASSWORD: "${DB_PASSWORD}"
+      API_TOKEN: "literal-should-omit"
+    env_file:
+      - secrets/.env.local
+    secrets:
+      -
+        source: db_password
+        target: /run/secrets/db_password
+secrets:
+  db_password:
+    file: secrets/db_password.txt

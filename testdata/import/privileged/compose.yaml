@@ -1,0 +1,4 @@
+services:
+  bad:
+    image: docker.io/library/nginx@sha256:0000000000000000000000000000000000000000000000000000000000000001
+    privileged: true

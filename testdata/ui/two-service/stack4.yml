@@ -1,0 +1,20 @@
+# Minimal flow-style Compose for import stub/parse tests (not a vendor stack).
+name: stack4
+networks:
+  front: {}
+  back: {}
+services:
+  tika:
+    image: docker.io/library/busybox@sha256:1111111111111111111111111111111111111111111111111111111111111111
+    ports:
+      - "127.0.0.1:9998:9998"
+    networks: [front]
+    volumes:
+      - ../logs/stack4/tika:/logs:z
+      - ../data/stack4/tika.yml:/config/tika.yml:ro
+  ocr:
+    image: docker.io/library/busybox@sha256:2222222222222222222222222222222222222222222222222222222222222222
+    networks: [front, back]
+  api:
+    image: docker.io/library/nginx@sha256:0000000000000000000000000000000000000000000000000000000000000001
+    networks: [back]

@@ -1,0 +1,153 @@
+# Positive coverage for union arms / enums under-represented in other fixtures.
+apiVersion: iacpack.io/v1alpha1
+kind: Project
+metadata:
+  name: union-arms
+  version: 0.1.0
+spec:
+  target:
+    profile: compose-docker/v1
+  mode: development
+  parameters:
+    flag:
+      phase: deploy
+      type: boolean
+      default: true
+    ratio:
+      phase: deploy
+      type: number
+      default: 1.5
+      minimum: 0
+      maximum: 10
+    label:
+      phase: build
+      type: string
+      default: demo
+      pattern: "^[a-z]+$"
+    count:
+      phase: deploy
+      type: integer
+      default: 2
+    flavor:
+      phase: deploy
+      type: enum
+      choices:
+        - a
+        - b
+      default: a
+  secrets:
+    tok:
+      required: false
+      delivery: file
+  images:
+    app:
+      build:
+        context: app
+        dockerfile: Dockerfile
+        include:
+          - "**"
+        args:
+          LABEL:
+            parameter: label
+        expectedImageID: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    probe:
+      ref: docker.io/library/busybox:1.36
+      delivery: pull
+  resources:
+    cfg:
+      source: config
+      include:
+        - app.yaml
+      destination: config
+      allowEmpty: false
+  networks:
+    managed-net:
+    ext-net:
+      external:
+        name: host-bridge
+  volumes:
+    data:
+      retention: delete
+    shared:
+      external:
+        name: shared-vol
+  services:
+    worker:
+      image: probe
+      restart: "no"
+      ports:
+        - container: 5353
+          host: 5353
+          protocol: udp
+          bind: 127.0.0.1
+      networks:
+        - managed-net
+        - ext-net
+      mounts:
+        - volume: shared
+          target: /shared
+          readOnly: true
+      environment:
+        FLAG:
+          parameter: flag
+        RATIO:
+          parameter: ratio
+        COUNT:
+          literal: "2"
+    app:
+      image: app
+      restart: on-failure
+      dependsOn:
+        - target: worker
+          condition: started
+        - target: seed
+          condition: completedSuccessfully
+      mounts:
+        - volume: data
+          target: /data
+        - resource: cfg
+          source: app.yaml
+          target: /etc/app.yaml
+          readOnly: true
+      networks:
+        - managed-net
+      secrets:
+        - ref: tok
+          target: /run/secrets/tok
+      healthcheck:
+        command:
+          - /bin/true
+        interval: 10s
+        timeout: 2s
+        retries: 3
+  tasks:
+    seed:
+      phase: preStart
+      image: app
+      command:
+        - /app/seed
+      rerun: manual
+      timeout: 30s
+    announce:
+      phase: postDeploy
+      image: probe
+      command:
+        - echo
+        - done
+      dependsOn:
+        - target: app
+          condition: healthy
+      rerun: oncePerDeployment
+  package:
+    generateReadme: false
+    generateEnvExample: true
+  x-ui:
+    nodes:
+      app:
+        x: 10
+        y: 10
+        category: custom
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1.25

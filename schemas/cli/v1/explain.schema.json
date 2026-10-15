@@ -1,0 +1,37 @@
+{
+  "$id": "iacpack.schemas.cli.v1.explain",
+  "title": "iacpack explain command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "iacpack.cli/v1" },
+    "command": { "type": "string", "const": "explain" },
+    "ok": { "type": "boolean" },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["service", "image", "imageRef", "user", "gpu", "ldLibraryPath", "devices", "envKeys"],
+          "properties": {
+            "service": { "type": "string" },
+            "image": { "type": "string" },
+            "imageRef": { "type": "string" },
+            "user": { "type": "string" },
+            "gpu": { "type": "string" },
+            "ldLibraryPath": { "type": "string" },
+            "devices": { "type": "array", "items": { "type": "string" } },
+            "envKeys": { "type": "array", "items": { "type": "string" } },
+            "environmentFrom": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "iacpack.schemas.cli.v1.diagnostics" }
+    }
+  }
+}

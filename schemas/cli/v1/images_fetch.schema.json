@@ -1,0 +1,31 @@
+{
+  "$id": "iacpack.schemas.cli.v1.images_fetch",
+  "title": "iacpack images fetch command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "iacpack.cli/v1" },
+    "command": { "type": "string", "const": "images fetch" },
+    "ok": { "type": "boolean" },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["output", "images", "blobs"],
+          "properties": {
+            "output": { "type": "string" },
+            "images": { "type": "integer", "minimum": 0 },
+            "blobs": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "iacpack.schemas.cli.v1.diagnostics" }
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$id": "iacpack.schemas.cli.v1.migrate",
+  "title": "iacpack manifest migrate command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "manifest migrate"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to", "output", "mode", "bytes"],
+          "properties": {
+            "from": { "type": "string" },
+            "to": { "type": "string" },
+            "output": { "type": "string" },
+            "mode": { "type": "string" },
+            "bytes": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "iacpack.schemas.cli.v1.diagnostics"
+      }
+    }
+  }
+}

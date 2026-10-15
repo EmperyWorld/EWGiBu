@@ -1,0 +1,58 @@
+{
+  "$id": "iacpack.schemas.cli.v1.diff",
+  "title": "iacpack diff command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "diff"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to", "fromSemanticHash", "toSemanticHash", "identical", "summary", "changes"],
+          "properties": {
+            "from": { "type": "string" },
+            "to": { "type": "string" },
+            "fromSemanticHash": { "type": "string" },
+            "toSemanticHash": { "type": "string" },
+            "identical": { "type": "boolean" },
+            "summary": { "type": "object" },
+            "changes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "path"],
+                "properties": {
+                  "kind": { "type": "string" },
+                  "path": { "type": "string" },
+                  "detail": { "type": "string" },
+                  "risk": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "iacpack.schemas.cli.v1.diagnostics"
+      }
+    }
+  }
+}

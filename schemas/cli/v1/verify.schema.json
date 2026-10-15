@@ -1,0 +1,64 @@
+{
+  "$id": "iacpack.schemas.cli.v1.verify",
+  "title": "iacpack verify command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "verify"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "formatVersion", "project", "semanticHash", "entries", "compressedSize", "expandedSize", "capabilities"],
+          "properties": {
+            "path": { "type": "string" },
+            "formatVersion": { "type": "string" },
+            "project": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "version", "mode"],
+              "properties": {
+                "name": { "type": "string" },
+                "version": { "type": "string" },
+                "mode": { "type": "string" }
+              }
+            },
+            "semanticHash": { "type": "string" },
+            "entries": { "type": "integer", "minimum": 0 },
+            "compressedSize": { "type": "integer", "minimum": 0 },
+            "expandedSize": { "type": "integer", "minimum": 0 },
+            "capabilities": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["embedImages", "includeRuntime", "hasPreview"],
+              "properties": {
+                "embedImages": { "type": "boolean" },
+                "includeRuntime": { "type": "boolean" },
+                "hasPreview": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "iacpack.schemas.cli.v1.diagnostics"
+      }
+    }
+  }
+}

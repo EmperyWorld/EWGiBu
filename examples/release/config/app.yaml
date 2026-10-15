@@ -1,0 +1,2 @@
+# Example application config packaged as a declared resource.
+listen: 127.0.0.1:8080

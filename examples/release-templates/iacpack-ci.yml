@@ -1,0 +1,75 @@
+# iacpack CI — validate / lock / build / verify only.
+# No publish, deploy, push, or gh steps (ADR-019). Operator publishes manually.
+name: iacpack-ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iacpack-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # actions/checkout@v4.2.2
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      # actions/setup-go (pinned by full SHA)
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # actions/setup-node (pinned) — optional when the workspace has web/
+      - name: Setup Node
+        if: hashFiles('web/package.json') != ''
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Resolve iacpack CLI
+        run: |
+          set -eu
+          if [ -x ./bin/iacpack ]; then
+            echo "using ./bin/iacpack"
+          elif [ -f ./cmd/iacpack/main.go ]; then
+            go build -trimpath -ldflags "-s -w" -o ./bin/iacpack ./cmd/iacpack
+          else
+            echo "iacpack CLI not found: place a binary at ./bin/iacpack or include ./cmd/iacpack" >&2
+            exit 1
+          fi
+          ./bin/iacpack version
+
+      - name: Validate
+        run: ./bin/iacpack validate --workspace .
+
+      - name: Lock
+        run: ./bin/iacpack lock --workspace .
+
+      - name: Build
+        run: ./bin/iacpack build --workspace .
+
+      - name: Verify bundle
+        run: |
+          set -eu
+          bundle=$(find .iacpack-out -name '*.iacbundle' -type f | sort | head -n 1)
+          if [ -z "${bundle}" ]; then
+            echo "no .iacbundle under .iacpack-out; build may have produced directory-only output" >&2
+            exit 1
+          fi
+          ./bin/iacpack verify "${bundle}"
+
+      # Intentionally no deploy / release / gh / push / registry publish steps.

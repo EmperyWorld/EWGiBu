@@ -1,0 +1,40 @@
+project: acme-shop@1.4.0
+deploymentHash: e2518af4ea7ea989dc0a0f90cce5eeef439de2d7beaff0b41c964256a7ac6bb9
+actions: 12
+edges: 22
+order:
+  - action:verify
+  - action:image/app
+  - action:image/postgres
+  - action:network/backend
+  - action:resource/app-config
+  - action:volume/db-data
+  - action:service/db/start
+  - action:service/db/ready
+  - action:service/app/start
+  - action:service/app/ready
+  - action:task/migrate
+  - action:finalize
+edgesDetail:
+  action:image/app -> action:service/app/start
+  action:image/app -> action:task/migrate
+  action:image/postgres -> action:service/db/start
+  action:network/backend -> action:service/app/start
+  action:network/backend -> action:service/db/start
+  action:resource/app-config -> action:service/app/start
+  action:service/app/ready -> action:finalize
+  action:service/app/start -> action:service/app/ready [started]
+  action:service/db/ready -> action:finalize
+  action:service/db/ready -> action:service/app/start [healthy]
+  action:service/db/ready -> action:task/migrate [healthy]
+  action:service/db/start -> action:service/db/ready [started]
+  action:task/migrate -> action:finalize
+  action:verify -> action:image/app
+  action:verify -> action:image/postgres
+  action:verify -> action:network/backend
+  action:verify -> action:resource/app-config
+  action:verify -> action:service/app/start
+  action:verify -> action:service/db/start
+  action:verify -> action:task/migrate
+  action:verify -> action:volume/db-data
+  action:volume/db-data -> action:service/db/start

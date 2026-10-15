@@ -1,0 +1,54 @@
+{
+  "$id": "iacpack.schemas.cli.v1.version",
+  "title": "iacpack version command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "version"
+    },
+    "ok": {
+      "type": "boolean",
+      "const": true
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["product", "version", "goVersion", "commit", "dirty"],
+      "properties": {
+        "product": {
+          "type": "string",
+          "const": "iacpack"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "goVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dirty": {
+          "type": "boolean"
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "maxItems": 0,
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

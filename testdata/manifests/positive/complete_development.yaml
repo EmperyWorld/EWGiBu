@@ -1,0 +1,115 @@
+apiVersion: iacpack.io/v1alpha1
+kind: Project
+metadata:
+  name: acme-dev
+  version: 0.2.0
+  description: Development packaging example with local image build
+spec:
+  target:
+    profile: compose-docker/v1
+  mode: development
+  parameters:
+    app-mode:
+      phase: build
+      type: enum
+      choices:
+        - development
+        - debug
+      default: development
+    http-port:
+      phase: deploy
+      type: integer
+      default: 8080
+  secrets:
+    api-token:
+      delivery: file
+      description: API token file
+  images:
+    app:
+      build:
+        context: app
+        dockerfile: Dockerfile
+        include:
+          - "**"
+        exclude:
+          - .git/**
+          - .env
+          - dist/**
+        args:
+          APP_MODE:
+            parameter: app-mode
+        expectedImageID: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    redis:
+      ref: docker.io/library/redis@sha256:3333333333333333333333333333333333333333333333333333333333333333
+      delivery: pull
+  networks:
+    frontend:
+  volumes:
+    cache:
+      retention: delete
+  services:
+    cache:
+      image: redis
+      networks:
+        - frontend
+      restart: always
+    app:
+      image: app
+      command:
+        - /app/server
+      entrypoint:
+        - /bin/app
+      environment:
+        MODE:
+          parameter: app-mode
+        PORT:
+          literal: "8080"
+      secrets:
+        - ref: api-token
+          target: /run/secrets/api-token
+      ports:
+        - container: 8080
+          host: 8080
+          bind: 127.0.0.1
+          protocol: tcp
+      networks:
+        - frontend
+      dependsOn:
+        - target: cache
+          condition: started
+      healthcheck:
+        command:
+          - /app/healthcheck
+        interval: 5s
+        timeout: 3s
+        startPeriod: 2s
+        retries: 5
+  tasks:
+    warmup:
+      phase: preStart
+      image: app
+      command:
+        - /app/warmup
+      timeout: 1m
+      retry:
+        count: 2
+        initialBackoff: 200ms
+        multiplier: 2
+        maxBackoff: 5s
+      rerun: always
+  package:
+    generateReadme: true
+    generateEnvExample: true
+  x-ui:
+    nodes:
+      app:
+        x: 200
+        y: 80
+      cache:
+        x: 40
+        y: 80
+        category: cache
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1

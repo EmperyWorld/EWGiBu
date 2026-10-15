@@ -1,0 +1,29 @@
+# ADR-020 F1 inverse-emit fixture (patterns from Docker Compose reference).
+name: f1
+
+networks:
+  back:
+    driver: bridge
+
+services:
+  tei-embed:
+    image: ghcr.io/huggingface/text-embeddings-inference:${TEI_IMAGE_TAG:-cpu-1.7.2}
+    mem_limit: ${TEI_MEM:-512M}
+    networks: [back]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1/health >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ${CACHE_DIR:-data/cache}:/data:Z
+
+  worker:
+    image: docker.io/library/alpine:3.20
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 256M
+    mem_limit: 256M
+    networks: [back]

@@ -1,0 +1,8 @@
+# Конфиг для stack1. Логи в /logs (docker/logs/stack1/elasticsearch).
+cluster.name: "docker-cluster"
+network.host: 0.0.0.0
+http.host: 0.0.0.0
+path.logs: /logs
+discovery.type: single-node
+xpack.security.enabled: false
+logger.level: INFO

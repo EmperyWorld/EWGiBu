@@ -1,0 +1,64 @@
+#!/bin/sh
+# pack-migrate — container-only SQL bootstrap for iacpack migration tasks (ADR-009).
+#
+# Mount the migrations tree at /migrations. Expect:
+#   /migrations/baseline.sql   full schema for empty DB (required for greenfield)
+#   /migrations/pending/*.sql  incremental scripts
+#   /migrations/applied/       history only — NEVER applied by this script
+#
+# Env (typical Compose secret + network DNS name):
+#   PGHOST PGPORT PGUSER PGDATABASE  and PGPASSWORD (or peer auth)
+#
+# Tracking: public.iacpack_schema_migrations(id text primary key)
+# Record id "baseline" after baseline.sql; record each pending filename once.
+#
+# Invoke as argv (no bash -lc):
+#   command: ["/migrations/pack-migrate"]
+#
+set -eu
+
+MIG_DIR="${MIG_DIR:-/migrations}"
+BASELINE="$MIG_DIR/baseline.sql"
+PENDING="$MIG_DIR/pending"
+PSQL="psql -v ON_ERROR_STOP=1"
+
+$PSQL -c "CREATE TABLE IF NOT EXISTS iacpack_schema_migrations (
+  id text PRIMARY KEY,
+  applied_at timestamptz NOT NULL DEFAULT now()
+);"
+
+applied() {
+  $PSQL -Atqc "SELECT 1 FROM iacpack_schema_migrations WHERE id = '$1' LIMIT 1" | grep -q 1
+}
+
+record() {
+  $PSQL -c "INSERT INTO iacpack_schema_migrations (id) VALUES ('$1') ON CONFLICT DO NOTHING;"
+}
+
+if ! applied baseline; then
+  if [ ! -f "$BASELINE" ]; then
+    echo "pack-migrate: missing $BASELINE (greenfield requires a baseline dump; do not replay applied/)" >&2
+    exit 1
+  fi
+  echo "pack-migrate: applying baseline.sql"
+  $PSQL -f "$BASELINE"
+  record baseline
+fi
+
+if [ -d "$PENDING" ]; then
+  # portable sorted glob
+  set -- "$PENDING"/*.sql
+  if [ -e "$1" ]; then
+    for f in $(ls "$PENDING"/*.sql | sort); do
+      id=$(basename "$f")
+      if applied "$id"; then
+        continue
+      fi
+      echo "pack-migrate: applying pending/$id"
+      $PSQL -f "$f"
+      record "$id"
+    done
+  fi
+fi
+
+echo "pack-migrate: OK"

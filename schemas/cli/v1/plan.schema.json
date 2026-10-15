@@ -1,0 +1,47 @@
+{
+  "$id": "iacpack.schemas.cli.v1.plan",
+  "title": "iacpack plan command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "iacpack.cli/v1" },
+    "command": { "type": "string", "const": "plan" },
+    "ok": { "type": "boolean" },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bundle", "project", "instance", "providerSlug", "semanticHash", "actions", "order", "secretRefs", "confirmations"],
+          "properties": {
+            "bundle": { "type": "string" },
+            "project": { "type": "string" },
+            "instance": { "type": "string" },
+            "providerSlug": { "type": "string" },
+            "semanticHash": { "type": "string" },
+            "compilePolicy": { "type": "string" },
+            "operatorPolicy": { "type": "string" },
+            "secretRefs": { "type": "array", "items": { "type": "string" } },
+            "deployParameters": { "type": "array", "items": { "type": "string" } },
+            "actions": { "type": "array" },
+            "order": { "type": "array", "items": { "type": "string" } },
+            "confirmations": { "type": "array", "items": { "type": "string" } },
+            "missingEnv": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "iacpack.schemas.cli.v1.diagnostics" }
+    }
+  }
+}

@@ -1,0 +1,67 @@
+/*
+ * Design tokens harvested from EmpiierOS shell-ui (EliteEW desktop surface).
+ * `--desktop-*` is the merge surface; `--os-*` aliases keep component CSS short.
+ */
+
+:root {
+  color-scheme: dark;
+  --desktop-accent-rgb: 56 189 248;
+  --desktop-bg-primary-rgb: 17 24 39;
+  --desktop-bg-secondary-rgb: 30 36 48;
+  --desktop-fg-primary-rgb: 248 250 252;
+  --desktop-fg-secondary-rgb: 203 213 225;
+  --desktop-border-rgb: 71 85 105;
+  --desktop-text-primary: #f8fafc;
+  --desktop-text-secondary: #e2e8f0;
+  --desktop-text-muted: #94a3b8;
+  --desktop-text-dim: #64748b;
+  --desktop-surface-app: linear-gradient(
+    145deg,
+    rgba(3, 7, 18, 0.97) 0%,
+    rgba(17, 24, 39, 0.95) 42%,
+    rgba(3, 7, 18, 0.99) 100%
+  );
+  --desktop-surface-panel: rgba(17, 24, 39, 0.76);
+  --desktop-surface-panel-strong: rgba(15, 23, 42, 0.9);
+  --desktop-surface-soft: rgba(255, 255, 255, 0.045);
+  --desktop-surface-soft-hover: rgba(255, 255, 255, 0.085);
+  --desktop-surface-soft-active: rgba(255, 255, 255, 0.11);
+  --desktop-surface-accent: rgba(var(--desktop-accent-rgb), 0.12);
+  --desktop-surface-accent-strong: rgba(var(--desktop-accent-rgb), 0.2);
+  --desktop-border-subtle: rgba(255, 255, 255, 0.08);
+  --desktop-border-strong: rgba(255, 255, 255, 0.14);
+  --desktop-radius: 0.45rem;
+  --desktop-radius-lg: 0.6rem;
+  --desktop-radius-xl: 0.7rem;
+  --desktop-radius-pill: 9999px;
+  --desktop-shadow-panel: 0 28px 64px rgba(0, 0, 0, 0.48);
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --color-accent-green: #10b981;
+  --color-accent-amber: #f59e0b;
+  --color-accent-red: #ef4444;
+  --os-bg: rgb(var(--desktop-bg-primary-rgb));
+  --os-surface: var(--desktop-surface-panel-strong);
+  --os-surface-soft: var(--desktop-surface-soft);
+  --os-border: rgb(var(--desktop-border-rgb));
+  --os-border-soft: var(--desktop-border-subtle);
+  --os-fg: var(--desktop-text-primary);
+  --os-muted: var(--desktop-text-muted);
+  --os-accent: rgb(var(--desktop-accent-rgb));
+  --os-ok: var(--color-accent-green);
+  --os-warn: var(--color-accent-amber);
+  --os-danger: var(--color-accent-red);
+  --os-radius: var(--desktop-radius-lg);
+  --os-taskbar-height: 34px;
+  --os-font: "Segoe UI Variable", "Segoe UI", "IBM Plex Sans", "Source Sans 3", ui-sans-serif, sans-serif;
+  --os-display: "Segoe UI Variable Display", "Segoe UI", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  font-family: var(--os-font);
+  line-height: 1.32;
+  color: var(--os-fg);
+  background: var(--os-bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}

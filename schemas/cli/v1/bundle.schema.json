@@ -1,0 +1,33 @@
+{
+  "$id": "iacpack.schemas.cli.v1.bundle",
+  "title": "iacpack bundle portable-kit JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "iacpack.cli/v1" },
+    "command": { "type": "string", "const": "bundle" },
+    "ok": { "type": "boolean" },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outputDir", "secrets", "images", "hostPaths"],
+          "properties": {
+            "outputDir": { "type": "string" },
+            "secrets": { "type": "array", "items": { "type": "string" } },
+            "images": { "type": "array", "items": { "type": "string" } },
+            "hostPaths": { "type": "array" },
+            "bundle": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "iacpack.schemas.cli.v1.diagnostics" }
+    }
+  }
+}

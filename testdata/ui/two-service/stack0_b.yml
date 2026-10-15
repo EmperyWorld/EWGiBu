@@ -1,0 +1,1252 @@
+name: stack0-backend
+# =============================================================================
+# EliteEW · stack 0 — backend (Dockerfile docker/builders/stack0-api: api, queue-worker, …)
+# =============================================================================
+# Запуск (из корня репо):
+#   docker compose -f docker/stack/stack0_b.yml --env-file docker/env_file/.env.stack0.backend up -d
+# Секреты SSOT: docker/env_file/.env.stack0.backend (не коммитить; compose --env-file).
+# Container injection: materialize roles → .env.stack0.{shared,api,jobs}
+#   bash docker/scripts/stack0-env-materialize-roles.sh
+# Сверка с шаблоном: docker/env_file/.env.stack0.backend.example.
+# ``EWA_*`` / ``ELITEEW_SELF_HTTP_*`` — только через ``env_file``, не секция ``environment`` (см. EWA-POSTGRES-RUNBOOK.md).
+#
+# Workers на punisher: profile ``punisher-local-workers`` (api-worker, celery-worker). По умолчанию не стартуют;
+# после миграции на .141 используйте docker/stack/stack0_b_workers_lan.yml (см. LAN-WORKERS-141.md).
+# Site Studio worker (временная пауза): profile ``site-studio-worker`` — по умолчанию **выключен**
+# (не ``up`` без ``--profile site-studio-worker``). Каталог: группа допуска «NO» — см. SITE-STUDIO.md.
+# API preflight one-shot: profile ``stack0-api-preflight`` — не в обычном ``up``; helper
+# ``docker/scripts/stack0-api-preflight-run.sh``. Fail-closed gate остаётся в ``start_all.sh``.
+# Опциональная настройка персон спутника: ``EWA_PERSONA_*`` в ``docker/env_file/.env.stack0.backend`` (шаблон ключей в ``.env.stack0.backend.example``).
+#
+# Healthchecks: compose Layer A vs deploy smoke Layer C — documentation/platform/docker-re_doc/STACK0-HEALTHCHECK-LAYERS.md
+#
+# Сети ew_net_* — external (см. docker/scripts/networks-create.sh при первой установке).
+# Порты: FastAPI 29000→8000, WebSocket 28999→28999 (см. сервис eliteew-api-prod).
+# SELinux / Fedora: томам задан контекст `:z` (shared). При Permission denied — правьте `:z`/`:Z`, пути и UID/GID
+# (см. documentation/platform/docker-re_doc/STACK0-BACKEND-IMAGES.md §SELinux, DOCKER-SELINUX-BIND-MOUNTS.md).
+# Для MCS на bind-mount: `security_opt: label=level:s0` (контейнер и relabel тома без категорий).
+# `security_opt: label=disable` не использовать по умолчанию; допустимо точечно для GPU CDI-сервисов
+# при подтверждённых AVC на `/dev/nvidia*` (фиксировать в worklog/runbook).
+# =============================================================================
+
+networks:
+  ew_net_6211:
+    external: true
+  ew_net_2847:
+    external: true
+  ew_net_9O11:
+    external: true
+  ew_net_4532:
+    external: true
+  ew_net_7198:
+    external: true
+  ew_net_3365:
+    external: true
+  ew_net_5402:
+    external: true
+
+services:
+  # ============================================================================
+  # EliteEW API Backend — HTTP/WebSocket tier (slim образ `api`; без Docker socket)
+  # ============================================================================
+  eliteew-api-prod:
+    # Образ таргета `api` из docker/builders/stack0-api/Dockerfile
+    image: ${STACK0_API_IMAGE}
+    container_name: ${STACK0_API_CONTAINER_NAME}
+    networks:
+      - ew_net_6211
+      - ew_net_2847
+      - ew_net_9O11
+      - ew_net_4532
+      - ew_net_7198
+      - ew_net_3365
+      - ew_net_5402
+    security_opt:
+      - no-new-privileges:true
+      # GPU CDI + SELinux Enforcing: /dev/nvidia* может блокироваться AVC (xserver_misc_device_t).
+      - label=disable
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${API_BIND_ADDRESS}:${API_HOST_PORT}:8000"
+      - "${API_BIND_ADDRESS}:${WS_HOST_PORT}:28999"
+    user: "${STACK0_USER:?STACK0_USER not set}"
+    # Ключи в ``environment`` ниже: подстановка ${VAR} из ``docker compose --env-file …``.
+    # Дополнительно см. ``env_file`` как у воркеров Celery — в API недоступны переменные, которые есть только в
+    # файле и не проброены явным списком. Одноимённые ключи из ``environment`` перекрывают env_file.
+    env_file:
+      - ../env_file/.env.stack0.shared
+      - ../env_file/.env.stack0.api
+
+    # ============================================================================
+    # VOLUMES - МОНТИРУЕМ КОД ДЛЯ БЫСТРОЙ РАЗРАБОТКИ БЕЗ ПЕРЕСБОРКИ
+    # ============================================================================
+    volumes:
+      # docker/ в корне репо: ../ = корень репо, ../EliteEW = проект
+      # API код монтируется в несколько сервисов stack0 (api + workers) -> shared label :z, не :Z.
+      - ../../shared/api:/app/api:ro,z
+      # Справочник: sync kb-*.md из git (product_assistant_kb_sync.py → /app/documentation/…)
+      - ../../documentation:/app/documentation:ro,z
+      # Whole dist-build dir — single-file bind breaks after rebuild (stale inode in container).
+      - ../../shared/web/frontend/dist-build:/app/frontend-dist:ro,z
+      # APK release store (independent from frontend dist-build); API reads /app/mobile-release/*.apk.
+      - ../../local/binaries:/app/mobile-release:ro,z
+      # Comfy workflow JSON (music/images UGS) — см. api/services/studio_comfy_workflows.py → /app/comfyui/*.json
+      - ../../host/comfyui:/app/comfyui:ro,z
+      - ../../host/generated_files:/app/generated_files:z
+      - ../../site-templates/olenti:/app/site-templates/olenti:ro,z
+      - ../../docker/builders/stack0-api/scripts/start_all.sh:/app/docker/scripts/start_all.sh:ro,z
+      - ../../docker/builders/stack0-api/scripts/lib:/app/docker/scripts/lib:ro,z
+      - ../../docker/data/stack9/qwen3-tts/voice_contract.json:/app/qwen3-data/voice_contract.json:ro,z
+      - ../../docker/data/stack9/qwen3-tts/voice_profiles.json:/app/qwen3-data/voice_profiles.json:ro,z
+      - ../logs/stack0/eliteew-api-prod:/logs:z
+
+    # ============================================================================
+    # ENVIRONMENT
+    # ============================================================================
+    environment:
+      - TZ=Asia/Vladivostok
+      # Логи в файл на хосте (docker/logs/stack0/eliteew-api-prod) для Vector/просмотра
+      - ELITEEW_LOG_FILE=/logs/eliteew-api.log
+      - ELITEEW_APP_BUILD_VERSION_FILE=/app/frontend-dist/app-build-version.txt
+      # Уровень structlog/stdlib (в контейнер не подставляется env_file — только явный проброс)
+      - ELITEEW_LOG_LEVEL=${ELITEEW_LOG_LEVEL:-INFO}
+      # Python (unbuffered so logs appear immediately in docker logs)
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=${PYTHONDONTWRITEBYTECODE}
+      # Опционально: PYTHONPYCACHEPREFIX для .pyc при :ro на shared/api; пусто → start_all.sh → ${STACK0_RUNTIME_HOME}/python_pycache (см. STACK0-API-STARTUP.md)
+      - PYTHONPYCACHEPREFIX=${PYTHONPYCACHEPREFIX:-}
+      # EliteEW docker/builders/stack0-api/scripts/start_all.sh — ключи из env (:? в скрипте); исключение: PYTHONPYCACHEPREFIX см. выше
+      - STACK0_RUNTIME_HOME=${STACK0_RUNTIME_HOME}
+      - STACK0_CACHE_DIR=${STACK0_CACHE_DIR}
+      - STACK0_ONNX_HOME=${STACK0_ONNX_HOME}
+      - STACK0_HF_HOME=${STACK0_HF_HOME}
+      - STACK0_PYTHON_VENV=${STACK0_PYTHON_VENV}
+      - STACK0_DOC_BUILDER_REL=${STACK0_DOC_BUILDER_REL}
+      - STACK0_DOC_REQUIREMENTS_REL=${STACK0_DOC_REQUIREMENTS_REL}
+      - STACK0_DOC_DOCFILE_REL=${STACK0_DOC_DOCFILE_REL}
+      - STACK0_DOC_RUNTIME_LAYER_HINT=${STACK0_DOC_RUNTIME_LAYER_HINT}
+      - STACK0_DOC_ENV_FILE_HINT=${STACK0_DOC_ENV_FILE_HINT}
+      - STACK0_DOC_REDIS_HOST_HINT=${STACK0_DOC_REDIS_HOST_HINT}
+      - STACK0_DOC_STACK1_HINT=${STACK0_DOC_STACK1_HINT}
+      - STACK0_DOC_STACK4_HINT=${STACK0_DOC_STACK4_HINT}
+      - STACK0_DOC_WHISPER_BACKEND_HINT=${STACK0_DOC_WHISPER_BACKEND_HINT}
+      - STACK0_LL_HTTP_HEALTH_SUFFIX=${STACK0_LL_HTTP_HEALTH_SUFFIX}
+      - STACK0_TIKA_HTTP_HEALTH_SUFFIX=${STACK0_TIKA_HTTP_HEALTH_SUFFIX}
+      - STACK0_FFMPEG_BIN=${STACK0_FFMPEG_BIN}
+      - STACK0_TCP_PROBE_TIMEOUT_SEC=${STACK0_TCP_PROBE_TIMEOUT_SEC}
+      - STACK0_REDIS_FORBIDDEN_HOSTS=${STACK0_REDIS_FORBIDDEN_HOSTS}
+      - STACK0_DOC_VOICE_TRANSCRIBE_ENDPOINT=${STACK0_DOC_VOICE_TRANSCRIBE_ENDPOINT}
+      - STACK0_DOC_LLM_OVERVIEW_REL=${STACK0_DOC_LLM_OVERVIEW_REL}
+      - STACK0_PACKAGE_IMPORT_CHECKLIST=${STACK0_PACKAGE_IMPORT_CHECKLIST}
+      - STACK0_UVICORN_TIMEOUT_KEEP_ALIVE=${STACK0_UVICORN_TIMEOUT_KEEP_ALIVE}
+      - STACK0_UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN=${STACK0_UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN}
+      # start_all.sh: очистка PYTHONPYCACHEPREFIX + попытка под /app/api (compose default 1); Redis FLUSHALL (default 0)
+      - STACK0_REMOVE_PYC_ON_START=${STACK0_REMOVE_PYC_ON_START:-1}
+      - STACK0_REDIS_FLUSHALL_ON_START=${STACK0_REDIS_FLUSHALL_ON_START:-0}
+      # start_all.sh TCP/HTTP preflight: comma-separated fail-closed keys (postgres,redis,ewa_postgres,minio,elasticsearch,llama,tika)
+      - STACK0_PREFLIGHT_FAIL_ON=${STACK0_PREFLIGHT_FAIL_ON:-postgres,redis,ewa_postgres}
+      - STACK0_ENABLE_LEGACY_ML_CACHE_DIRS=${STACK0_ENABLE_LEGACY_ML_CACHE_DIRS:-0}
+      - STACK0_PREFLIGHT_VERBOSE=${STACK0_PREFLIGHT_VERBOSE:-0}
+      # Site Studio worker heartbeat poll — FastAPI lifespan only (not start_all.sh shell block).
+      - ELITEEW_REQUIRE_SITE_STUDIO_WORKER_AT_STARTUP=${ELITEEW_REQUIRE_SITE_STUDIO_WORKER_AT_STARTUP:-true}
+      - STACK0_SITE_STUDIO_STARTUP_WAIT_SECONDS=${STACK0_SITE_STUDIO_STARTUP_WAIT_SECONDS:-90}
+      - STACK0_SITE_STUDIO_STARTUP_POLL_SECONDS=${STACK0_SITE_STUDIO_STARTUP_POLL_SECONDS:-5}
+      - HOME=${STACK0_RUNTIME_HOME}
+      - ONNX_HOME=${STACK0_ONNX_HOME}
+      - HF_HOME=${STACK0_HF_HOME}
+      # ANSI colors in logs (set to 1 to enable when viewing in terminal)
+      - ELITEEW_LOG_COLOR=1
+      # Optional: JSON dump of each LLM request body before POST to stack2 (see STACK0-LLM-OVERVIEW.md §6).
+      - STACK2_LLM_DEBUG_SAVE_DIR=${STACK2_LLM_DEBUG_SAVE_DIR:-}
+      # Public JWT bypass in OAuth2ProtectionMiddleware (default false; use true only for break-glass docs)
+      - ELITEEW_PUBLIC_OPENAPI_DOCS=${ELITEEW_PUBLIC_OPENAPI_DOCS:-false}
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - ENABLE_RABBITMQ=${ENABLE_RABBITMQ}
+      - ENABLE_QUEUE_UGS=${ENABLE_QUEUE_UGS}
+      - ENABLE_QUEUE_DOCS=${ENABLE_QUEUE_DOCS}
+      - ENABLE_QUEUE_NOTIFICATIONS=${ENABLE_QUEUE_NOTIFICATIONS}
+      - ENABLE_QUEUE_EWRP=${ENABLE_QUEUE_EWRP}
+      - ENABLE_QUEUE_BI=${ENABLE_QUEUE_BI}
+      - ENABLE_QUEUE_VOICE=${ENABLE_QUEUE_VOICE}
+      # Site Studio enqueue (RabbitMQ `site_studio`); teardown выполняется site-studio-worker; inline fallback см. ниже.
+      - ENABLE_QUEUE_SITE_STUDIO=${ENABLE_QUEUE_SITE_STUDIO:-true}
+      - ELITEEW_SITE_STUDIO_ALLOW_INLINE_FALLBACK=${ELITEEW_SITE_STUDIO_ALLOW_INLINE_FALLBACK:-false}
+      - SITE_STUDIO_WORKER_READY_WINDOW_SECONDS=${SITE_STUDIO_WORKER_READY_WINDOW_SECONDS:-180}
+      # EWRP PDF slide screenshots — Playwright sidecar on queue-worker (not in API venv).
+      - BROWSER_RENDER_SERVICE_URL=${BROWSER_RENDER_SERVICE_URL:-http://stack0-eliteew-api-worker-prod:8095}
+      - SCIENCE_STACK_SERVICE_URL=${SCIENCE_STACK_SERVICE_URL:-http://stack0-eliteew-api-worker-prod:8096}
+      #CUDA/GPU (опционально: при запуске API на узле без GPU оставить пусто)
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      - CUDA_HOME=${CUDA_HOME}
+      - PYTORCH_ALLOC_CONF=${PYTORCH_ALLOC_CONF}
+      - OMP_NUM_THREADS=${OMP_NUM_THREADS}
+      - MKL_NUM_THREADS=${MKL_NUM_THREADS}
+      - ANONYMIZED_TELEMETRY=${ANONYMIZED_TELEMETRY}
+      #- TRANSFORMERS_CACHE=/app/api/.huggingface/.huggingface_cache устарело
+
+      # Whisper AI
+      - WHISPER_ENABLED=${WHISPER_ENABLED}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE}
+      - WHISPER_DEVICE=${WHISPER_DEVICE}
+      - WHISPER_COMPUTE_TYPE=${WHISPER_COMPUTE_TYPE}
+      - WHISPER_BATCH_SIZE=${WHISPER_BATCH_SIZE}
+      - WHISPER_MODEL_DIR=${WHISPER_MODEL_DIR}
+      - WHISPER_VAD_FILTER=${WHISPER_VAD_FILTER}
+      - WHISPER_BEAM_SIZE=${WHISPER_BEAM_SIZE}
+      - WHISPER_LANGUAGE=${WHISPER_LANGUAGE}
+      # Voice TTS (stack9-silero; переопределение URL при необходимости)
+      - SILERO_SERVICE_URL=${SILERO_SERVICE_URL:-http://stack9-silero:8000}
+      - QWEN3_VOICE_CONTRACT=/app/qwen3-data/voice_contract.json
+      - QWEN3_VOICE_PROFILES=/app/qwen3-data/voice_profiles.json
+
+      # Database (из --env-file; POSTGRES_USER/POSTGRES_PASSWORD должны совпадать с .env.stack1 для работы со stack1)
+      - DATABASE_URL=${DATABASE_URL}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_EXTERNAL_PORT=30000
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      # Пулы SQLAlchemy + asyncpg (должны совпадать с .env.stack0.backend; см. STACK1-POSTGRES-TUNING.md)
+      - POSTGRES_POOL_SIZE=${POSTGRES_POOL_SIZE:-10}
+      - POSTGRES_MAX_OVERFLOW=${POSTGRES_MAX_OVERFLOW:-15}
+      - POSTGRES_POOL_TIMEOUT=${POSTGRES_POOL_TIMEOUT:-30}
+      - POSTGRES_POOL_RECYCLE=${POSTGRES_POOL_RECYCLE:-3600}
+      - ASYNCPG_POOL_MIN_SIZE=${ASYNCPG_POOL_MIN_SIZE:-1}
+      - ASYNCPG_POOL_MAX_SIZE=${ASYNCPG_POOL_MAX_SIZE:-5}
+
+      # EWA platform (отдельный Postgres; см. docker/stack/stack-ewa-postgres.yml).
+      # ``EWA_DATABASE_URL`` и остальные ``EWA_*`` / ``ELITEEW_SELF_HTTP_*`` задаются **только** через
+      # ``env_file: .env.stack0.shared`` (+ api/jobs) — не дублировать их здесь в ``environment`` с ``${VAR:-…}``:
+      # при ``docker compose up`` подстановка идёт из окружения хоста, и пустой VAR перебивает значения из env_file
+      # дефолтами (например ORCH_USE_ELITEEW_HTTP=0), из‑за чего «в контейнере не хватает» настроек из файла.
+      # Без гибридного режима не пробрасываем EWA_DATABASE_URL через ${...}: берём только из env_file.
+
+      # Redis (external_port по умолчанию 30001; пароль обязателен при requirepass в stack1)
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_EXTERNAL_PORT=30001
+      - USER_SITE_TEMPLATE_ROOT=/app/site-templates/olenti
+      - USER_SITE_STUDIO_RUNTIME_BASE_DIR=/opt/eliteew/host/runtime/user_site_studio
+      - USER_SITE_STUDIO_INTERNAL_HOST=host.docker.internal
+      - USER_SITE_STUDIO_PUBLIC_SCHEME=${USER_SITE_STUDIO_PUBLIC_SCHEME:-https}
+      - USER_SITE_STUDIO_PUBLIC_BASE_DOMAIN=${USER_SITE_STUDIO_PUBLIC_BASE_DOMAIN:-eliteew.ru}
+      - USER_SITE_STUDIO_PUBLIC_HOST_LABEL_SUFFIX=${USER_SITE_STUDIO_PUBLIC_HOST_LABEL_SUFFIX:--site}
+      - USER_SITE_STUDIO_ADMIN_APP_URL=${USER_SITE_STUDIO_ADMIN_APP_URL:-https://app.eliteew.ru}
+      - USER_SITE_STUDIO_DB_SCHEMA_STRATEGY=${USER_SITE_STUDIO_DB_SCHEMA_STRATEGY:-db-push}
+      - USER_SITE_STUDIO_HEALTH_TIMEOUT=${USER_SITE_STUDIO_HEALTH_TIMEOUT:-420}
+      - USER_SITE_STUDIO_HEALTH_POLL=${USER_SITE_STUDIO_HEALTH_POLL:-3}
+      # Оба заданы → новые инстансы Site Studio без копии исходников и без npm build на инстансе (см. site-templates/olenti/docker/)
+      - SITE_STUDIO_OLENTI_API_IMAGE=${SITE_STUDIO_OLENTI_API_IMAGE:-}
+      - SITE_STUDIO_OLENTI_FRONTEND_IMAGE=${SITE_STUDIO_OLENTI_FRONTEND_IMAGE:-}
+
+      # Object Storage (SeaweedFS; ключи из .env.stack0.backend, должны совпадать с .env.stack1)
+      - AWS_S3_ENDPOINT=${AWS_S3_ENDPOINT}
+      - S3_BUCKET=${S3_BUCKET}
+      - AWS_REGION=${AWS_REGION}
+      - S3_USE_PATH_STYLE=${S3_USE_PATH_STYLE}
+      - S3_SECURE=${S3_SECURE}
+      - MINIO_SECURE=${MINIO_SECURE}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      # Только SSE бакета в S3 (SeaweedFS); пусто в compose = не задано, смотри ENCRYPTION_ENABLED (см. .env.stack0.backend.example)
+      - S3_BUCKET_DEFAULT_ENCRYPTION=${S3_BUCKET_DEFAULT_ENCRYPTION:-}
+
+      # Authentication (из --env-file)
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM}
+      - JWT_EXPIRATION_MINUTES=${JWT_EXPIRATION_MINUTES}
+      - SECRET_KEY=${SECRET_KEY}
+      # PII encryption in DB (encryption.pii_key session var; required when ENCRYPTION_ENABLED=true)
+      - ENCRYPTION_ENABLED=${ENCRYPTION_ENABLED}
+      - ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
+
+      # Keycloak SSO
+      - KEYCLOAK_URL=${KEYCLOAK_URL}
+      - KEYCLOAK_PUBLIC_URL=${KEYCLOAK_PUBLIC_URL}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
+      - KEYCLOAK_WEB_CLIENT_ID=${KEYCLOAK_WEB_CLIENT_ID:-empery-web}
+      - KEYCLOAK_MOBILE_CLIENT_ID=${KEYCLOAK_MOBILE_CLIENT_ID:-empery-mobile}
+      - KEYCLOAK_VERIFY_AUDIENCE=${KEYCLOAK_VERIFY_AUDIENCE}
+      # Provider-agnostic auth (Wave C/D)
+      - AUTH_PROVIDER_BACKEND=${AUTH_PROVIDER_BACKEND:-keycloak}
+      - AUTH_PROVIDER_SHADOW_ENABLED=${AUTH_PROVIDER_SHADOW_ENABLED:-false}
+      - AUTH_PROVIDER_SHADOW_BACKEND=${AUTH_PROVIDER_SHADOW_BACKEND:-}
+      - AUTH_ROLE_CLIENT_IDS=${AUTH_ROLE_CLIENT_IDS:-}
+      - OIDC_PROVIDER_ISSUER_URL=${OIDC_PROVIDER_ISSUER_URL:-}
+      - OIDC_PROVIDER_CLIENT_ID=${OIDC_PROVIDER_CLIENT_ID:-}
+      - OIDC_PROVIDER_CLIENT_SECRET=${OIDC_PROVIDER_CLIENT_SECRET:-}
+      - OIDC_PROVIDER_WEB_CLIENT_ID=${OIDC_PROVIDER_WEB_CLIENT_ID:-}
+      - OIDC_PROVIDER_VERIFY_AUDIENCE=${OIDC_PROVIDER_VERIFY_AUDIENCE:-true}
+
+      # Jitsi Meet
+      - JITSI_APP_ID=${JITSI_APP_ID}
+      - JITSI_APP_SECRET=${JITSI_APP_SECRET}
+      - JITSI_JWT_SECRET=${JITSI_JWT_SECRET}
+      - JITSI_PUBLIC_URL=${JITSI_PUBLIC_URL:-https://meet.eliteew.ru}
+      - JITSI_XMPP_DOMAIN=${JITSI_XMPP_DOMAIN:-meet.eliteew.ru}
+      - JITSI_TOKEN_TTL_SECONDS=${JITSI_TOKEN_TTL_SECONDS:-3600}
+
+      # AI / LLM — имена LLAMA_* исторические (см. documentation/platform/docker-re_doc/STACK0-LLM-OVERVIEW.md).
+      # Реальный процесс может быть нативный Llama или OpenAI-compat llama-server; URL из .env.stack0.backend.
+      # AI Services (имена моделей и эмбеддингов — только docker/env_file/.env.stack0.backend)
+      - LLAMA_URL=${LLAMA_URL}
+      # Отдельный llama-server для POST /v1/embeddings (stack2-llama-embed); пусто = тот же хост, что LLAMA_URL
+      - LLAMA_EMBEDDING_URL=http://192.168.1.141:8081
+      # stack2-llama-rerank: база http://host:port без /v1 (API сам дергает /v1/rerank); пусто = реранк RAG выключен
+      - RAG_RERANK_BASE_URL=http://192.168.1.141:8082
+      # true = OpenAI-совместимый API (llama.cpp /v1/completions); false = нативный Llama /api/generate; пусто = авто
+      - LLAMA_USE_OPENAI_API=${LLAMA_USE_OPENAI_API:-}
+      - LLAMA_MODEL=${LLAMA_MODEL}
+      - LLAMA_EMBEDDING_MODEL=${LLAMA_EMBEDDING_MODEL}
+      - LLAMA_EMBED_TIMEOUT_SEC=${LLAMA_EMBED_TIMEOUT_SEC:-180}
+      # EWRP → LLM (Llama /api/generate или llama /v1/completions); тяжёлые модели — поднять таймауты при обрыве
+      - EWRP_LLAMA_OUTLINE_TIMEOUT_SEC=${EWRP_LLAMA_OUTLINE_TIMEOUT_SEC:-240}
+      - EWRP_LLAMA_SLIDE_TIMEOUT_SEC=${EWRP_LLAMA_SLIDE_TIMEOUT_SEC:-300}
+      - LLAMA_MODEL_BI=${LLAMA_MODEL_BI}
+      - LLAMA_MODEL_MARKETING=${LLAMA_MODEL_MARKETING}
+      # Music generator: UGS Llama chat для lyrics/style/improve (unified_config.llama_model_music_text_gen)
+      - LLAMA_MODEL_MUSIC_TEXT_GEN=${LLAMA_MODEL_MUSIC_TEXT_GEN:-}
+      - AI_EMBEDDINGS_FALLBACK_MODEL=${AI_EMBEDDINGS_FALLBACK_MODEL:-}
+      # Размерность векторов Chroma/RAG (должна совпадать с ответом эмбед-сервера для LLAMA_EMBEDDING_MODEL)
+      - AI_EMBEDDINGS_DIMENSION=${AI_EMBEDDINGS_DIMENSION:-768}
+      - MARKETING_CABINET_ROUTER_MODEL=${MARKETING_CABINET_ROUTER_MODEL}
+      # Music generator: полный JSON тел POST /music-generator/* в файлы (см. MUSIC-GENERATOR-REFERENCE.md §8.5)
+      - MUSIC_GENERATOR_DEBUG_JSON_DIR=${MUSIC_GENERATOR_DEBUG_JSON_DIR:-}
+      # ComfyUI: финальный JSON POST /prompt (граф workflow) в файлы (см. MUSIC-GENERATOR-REFERENCE.md §8.6)
+      - COMFYUI_DEBUG_SAVE_PROMPT_DIR=${COMFYUI_DEBUG_SAVE_PROMPT_DIR:-}
+      # Music Evolution: UGS input_data + Comfy prompt JSON per run (host: host/generated_files/music_evolution_debug_json)
+      - MUSIC_EVOLUTION_DEBUG_JSON_DIR=${MUSIC_EVOLUTION_DEBUG_JSON_DIR:-/app/generated_files/music_evolution_debug_json}
+      # ИМК RAG / UGS sanitize (unified_config; иначе дефолты в коде, не значения из .env.stack0.backend)
+      - IMC_RAG_NUM_PREDICT=${IMC_RAG_NUM_PREDICT:-}
+      - IMC_RAG_MAX_PROMPT_CHARS=${IMC_RAG_MAX_PROMPT_CHARS:-}
+      - IMC_RAG_MERGE_MAX_PROMPT_CHARS=${IMC_RAG_MERGE_MAX_PROMPT_CHARS:-}
+      - IMC_RAG_LLAMA_NUM_CTX=${IMC_RAG_LLAMA_NUM_CTX:-}
+      - IMC_RAG_LLAMA_REPEAT_PENALTY=${IMC_RAG_LLAMA_REPEAT_PENALTY:-}
+      - IMC_RAG_LLAMA_REPEAT_LAST_N=${IMC_RAG_LLAMA_REPEAT_LAST_N:-}
+      - IMC_RAG_LLAMA_TOP_P=${IMC_RAG_LLAMA_TOP_P:-}
+      - IMC_RAG_LLAMA_GENERATE_TIMEOUT_SEC=${IMC_RAG_LLAMA_GENERATE_TIMEOUT_SEC:-}
+      - UGS_SANITIZE_STRING_MAX_CHARS=${UGS_SANITIZE_STRING_MAX_CHARS:-}
+      - AIRFLOW_URL=${AIRFLOW_URL}
+      - AIRFLOW_USERNAME=${AIRFLOW_USERNAME}
+      - AIRFLOW_PASSWORD=${AIRFLOW_PASSWORD}
+
+      # Bez planner: LLM timeouts (native JSON / OpenAI-style; raise if SocketTimeout on bez_planner_native_json)
+      - ELITEEW_BEZ_PLANNER_LLM_TIMEOUT_INITIAL_SEC=${ELITEEW_BEZ_PLANNER_LLM_TIMEOUT_INITIAL_SEC:-120}
+      - ELITEEW_BEZ_PLANNER_LLM_TIMEOUT_REPLANNER_SEC=${ELITEEW_BEZ_PLANNER_LLM_TIMEOUT_REPLANNER_SEC:-90}
+      # Отдельная модель для JSON-плана (functiongemma и т.д.); из --env-file, см. .env.stack0.backend
+      - ELITEEW_BEZ_PLANNER_MODEL=${ELITEEW_BEZ_PLANNER_MODEL:-}
+      # json | native_tools — начальный план: JSON-схема или Llama tool submit_bez_plan
+      - ELITEEW_BEZ_PLANNER_MODE=${ELITEEW_BEZ_PLANNER_MODE:-json}
+      - ELITEEW_BEZ_DIAGNOSTIC_LOGS=${ELITEEW_BEZ_DIAGNOSTIC_LOGS:-true}
+
+      # Playwright / Chromium browsers path for PDF/EWRP exports
+      - PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH}
+
+      # Celery (URL собирается из REDIS_* в compose)
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - MARKETING_CACHE_DB=${MARKETING_CACHE_DB}
+      - MARKETING_CELERY_QUEUE=${MARKETING_CELERY_QUEUE}
+
+      # Document Processing (stack4: Tika, Gotenberg для PDF; значения как в .env.stack0.backend)
+      - TIKA_URL=${TIKA_URL:-http://stack4-tika:9998}
+      - GOTENBERG_URL=${GOTENBERG_URL:-http://stack4-gotenberg:3000}
+
+      # Elasticsearch (external_port по умолчанию 30007)
+      - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST}
+      - ELASTICSEARCH_PORT=${ELASTICSEARCH_PORT}
+      - ELASTICSEARCH_EXTERNAL_PORT=30007
+      - ELASTICSEARCH_USER=${ELASTICSEARCH_USER}
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
+      - ELASTICSEARCH_SCHEME=${ELASTICSEARCH_SCHEME}
+      # Client resilience (overlay latency); defaults match api.core.infra_client_timeouts
+      - ELASTICSEARCH_REQUEST_TIMEOUT=${ELASTICSEARCH_REQUEST_TIMEOUT:-60}
+      - ELASTICSEARCH_MAX_RETRIES=${ELASTICSEARCH_MAX_RETRIES:-2}
+      - ELASTIC_MAX_RETRIES=${ELASTIC_MAX_RETRIES:-}
+      - ELASTICSEARCH_RETRY_ON_TIMEOUT=${ELASTICSEARCH_RETRY_ON_TIMEOUT:-true}
+      - ELASTICSEARCH_CONNECT_TIMEOUT=${ELASTICSEARCH_CONNECT_TIMEOUT:-15}
+      - ELASTICSEARCH_DEAD_NODE_BACKOFF_FACTOR=${ELASTICSEARCH_DEAD_NODE_BACKOFF_FACTOR:-2}
+      - ELASTICSEARCH_MAX_DEAD_NODE_BACKOFF=${ELASTICSEARCH_MAX_DEAD_NODE_BACKOFF:-30}
+      - ELASTICSEARCH_SOFT_RECONNECT_INTERVAL_SEC=${ELASTICSEARCH_SOFT_RECONNECT_INTERVAL_SEC:-60}
+
+      # ChromaDB (database_manager; порты stack1-chroma: 30002 на хосте)
+      - CHROMADB_CONTAINER_NAME=${CHROMADB_CONTAINER_NAME:-stack1-chroma}
+      - CHROMADB_HOST=${CHROMADB_HOST:-stack1-chroma}
+      - CHROMADB_EXTERNAL_HOST=${CHROMADB_EXTERNAL_HOST:-127.0.0.1}
+      - CHROMADB_PORT=${CHROMADB_PORT:-8000}
+      - CHROMADB_EXTERNAL_PORT=${CHROMADB_EXTERNAL_PORT:-30002}
+
+      # SeaweedFS / MinIO (S3; stack1: 8333→30006, Filer UI 8888→30005)
+      - MINIO_HOST=${MINIO_HOST:-stack1-seaweedfs}
+      - MINIO_PORT=${MINIO_PORT:-8333}
+      - MINIO_EXTERNAL_PORT=${MINIO_EXTERNAL_PORT:-30006}
+      - MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT:-30005}
+
+      # RabbitMQ (stack1: 5672→30008, management 15672→30009)
+      - RABBITMQ_CONTAINER_NAME=${RABBITMQ_CONTAINER_NAME:-stack1-rabbitmq}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-stack1-rabbitmq}
+      - RABBITMQ_EXTERNAL_HOST=${RABBITMQ_EXTERNAL_HOST:-127.0.0.1}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_EXTERNAL_PORT=${RABBITMQ_EXTERNAL_PORT:-30008}
+      - RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT:-30009}
+      - RABBITMQ_MANAGEMENT_INTERNAL_PORT=${RABBITMQ_MANAGEMENT_INTERNAL_PORT:-15672}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
+      - RABBITMQ_HEARTBEAT=${RABBITMQ_HEARTBEAT:-60}
+      - RABBITMQ_BLOCKED_CONNECTION_TIMEOUT=${RABBITMQ_BLOCKED_CONNECTION_TIMEOUT:-300}
+
+      # Qdrant (stack1: 6333→30003, grpc 6334→30004)
+      - QDRANT_CONTAINER_NAME=${QDRANT_CONTAINER_NAME:-stack1-qdrant}
+      - QDRANT_HOST=${QDRANT_HOST:-stack1-qdrant}
+      - QDRANT_EXTERNAL_HOST=${QDRANT_EXTERNAL_HOST:-127.0.0.1}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_EXTERNAL_PORT=${QDRANT_EXTERNAL_PORT:-30003}
+      - QDRANT_GRPC_PORT=${QDRANT_GRPC_PORT:-6334}
+
+      # Infrastructure (имя сети для database_manager; без этого API не стартует)
+      - DOCKER_NETWORK=${DOCKER_NETWORK}
+      - HOST_IP=${HOST_IP}
+      - EXTERNAL_DOMAIN=${EXTERNAL_DOMAIN}
+      - API_HOST=${API_HOST}
+      - API_PORT=${API_PORT}
+      - API_WORKERS=${API_WORKERS}
+      - DEBUG_MODE=${DEBUG_MODE}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+
+      # Monitoring
+      - LOG_LEVEL=${LOG_LEVEL}
+      - LOG_FORMAT=${LOG_FORMAT}
+      # - PROMETHEUS_URL=http://stack3-prometheus:9090
+      # - GRAFANA_URL=http://stack3-grafana:3000
+
+      # Security
+      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE}
+
+      # Features
+      - REGISTRATION_ENABLED=${REGISTRATION_ENABLED}
+      - REGISTRATION_REQUIRE_APPROVAL=${REGISTRATION_REQUIRE_APPROVAL}
+      - ADMIN_PANEL_ENABLED=${ADMIN_PANEL_ENABLED}
+      - MONITORING_ENABLED=${MONITORING_ENABLED}
+
+      # Telegram (из --env-file)
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+      - TELEGRAM_WEBHOOK_BASE_URL=${TELEGRAM_WEBHOOK_BASE_URL}
+
+      # ComfyUI (inside Docker use port 3000)
+      - COMFYUI_URL=${COMFYUI_URL}
+      # UGS: false = direct ComfyUI for presentations (no Airflow)
+      - UGS_USE_AIRFLOW=${UGS_USE_AIRFLOW}
+      # Generated files (presentations, images) — base path must be writable
+      - GENERATED_FILES_BASE=${GENERATED_FILES_BASE}
+
+      # Production
+      - NODE_ENV=${NODE_ENV}
+      - DEBUG=${DEBUG}
+
+      #- PYTHONPATH=/app
+    # ============================================================================
+    # RESTART & HEALTH
+    # ============================================================================
+
+    labels:
+      - "stack=${STACK_LABEL}"
+      - "service=${SERVICE_LABEL}"
+      - "environment=${ENVIRONMENT_LABEL}"
+      - "gpu=${GPU_LABEL}"
+      - "features=${FEATURES_LABEL}"
+      - "version=${VERSION_LABEL}"
+
+    tmpfs:
+      - /tmp/runtime-root2
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+        labels: "stack,service,environment"
+    restart: unless-stopped
+    # CPU-only API image: LLM/STT/embed on stack2/stack9/gpu141 (no local CUDA in venv).
+    # ============================================================================
+    # REAL HEALTHCHECK - проверяем критические сервисы
+    # ============================================================================
+    healthcheck:
+      test: ["CMD", "curl", "-f", "${API_HEALTH_URL}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ============================================================================
+  # Operator/CI one-shot: same stack0_preflight.py as start_all.sh (NOT a compose depends_on gate).
+  # podman-compose 1.5 maps Compose "completed successfully" deps to wait-stopped; fail exit hangs API up.
+  # Authoritative fail-closed gate remains inside start_all.sh. Run via:
+  #   bash docker/scripts/stack0-api-preflight-run.sh
+  #   podman compose -f docker/stack/stack0_b.yml --env-file … --profile stack0-api-preflight run --rm eliteew-api-preflight
+  # ============================================================================
+  eliteew-api-preflight:
+    profiles: ["stack0-api-preflight"]
+    image: ${STACK0_API_IMAGE}
+    container_name: ${STACK0_API_PREFLIGHT_CONTAINER_NAME:-stack0-eliteew-api-preflight}
+    networks:
+      - ew_net_6211
+      - ew_net_2847
+      - ew_net_9O11
+      - ew_net_4532
+      - ew_net_7198
+      - ew_net_3365
+      - ew_net_5402
+    security_opt:
+      - no-new-privileges:true
+    user: "${STACK0_USER:?STACK0_USER not set}"
+    env_file:
+      - ../env_file/.env.stack0.shared
+      - ../env_file/.env.stack0.api
+    volumes:
+      - ../../docker/builders/stack0-api/scripts/lib:/app/docker/scripts/lib:ro,z
+      - ../logs/stack0/eliteew-api-preflight:/logs:z
+    environment:
+      - TZ=Asia/Vladivostok
+      - PYTHONUNBUFFERED=1
+      - STACK0_PYTHON_VENV=${STACK0_PYTHON_VENV}
+      - STACK0_LL_HTTP_HEALTH_SUFFIX=${STACK0_LL_HTTP_HEALTH_SUFFIX}
+      - STACK0_TIKA_HTTP_HEALTH_SUFFIX=${STACK0_TIKA_HTTP_HEALTH_SUFFIX}
+      - STACK0_FFMPEG_BIN=${STACK0_FFMPEG_BIN}
+      - STACK0_TCP_PROBE_TIMEOUT_SEC=${STACK0_TCP_PROBE_TIMEOUT_SEC}
+      - STACK0_REDIS_FORBIDDEN_HOSTS=${STACK0_REDIS_FORBIDDEN_HOSTS}
+      - STACK0_PACKAGE_IMPORT_CHECKLIST=${STACK0_PACKAGE_IMPORT_CHECKLIST}
+      - STACK0_PREFLIGHT_FAIL_ON=${STACK0_PREFLIGHT_FAIL_ON:-postgres,redis,ewa_postgres}
+      - STACK0_PREFLIGHT_VERBOSE=${STACK0_PREFLIGHT_VERBOSE:-0}
+      - STACK0_DOC_ENV_FILE_HINT=${STACK0_DOC_ENV_FILE_HINT}
+      - STACK0_DOC_REDIS_HOST_HINT=${STACK0_DOC_REDIS_HOST_HINT}
+      - STACK0_DOC_DOCFILE_REL=${STACK0_DOC_DOCFILE_REL}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - MINIO_HOST=${MINIO_HOST:-stack1-seaweedfs}
+      - MINIO_PORT=${MINIO_PORT:-8333}
+      - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST}
+      - ELASTICSEARCH_PORT=${ELASTICSEARCH_PORT}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-stack1-rabbitmq}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - LLAMA_URL=${LLAMA_URL}
+      - LLAMA_USE_OPENAI_API=${LLAMA_USE_OPENAI_API:-}
+      - TIKA_URL=${TIKA_URL}
+    command:
+      [
+        "/bin/bash",
+        "-lc",
+        'exec "${STACK0_PYTHON_VENV}" /app/docker/scripts/lib/stack0_preflight.py ${STACK0_PREFLIGHT_CLI_ARGS:-}',
+      ]
+    restart: "no"
+    labels:
+      - "stack=${STACK_LABEL}"
+      - "service=eliteew-api-preflight"
+      - "environment=${ENVIRONMENT_LABEL}"
+
+  eliteew-api-worker-prod:
+    profiles: ["punisher-local-workers"]
+    # podman-compose не поддерживает вложенные ${A:-${B:-${C}}}; fallback зафиксирован до standalone queue image.
+    image: ${STACK0_QUEUE_WORKER_IMAGE:-docker.io/library/eliteew-queue-worker:v3}
+    container_name: stack0-eliteew-api-worker-prod
+    command:
+      ["/bin/bash", "-lc", "exec /app/docker/scripts/start_queue_worker.sh"]
+    env_file:
+      - ../env_file/.env.stack0.shared
+      - ../env_file/.env.stack0.jobs
+    networks:
+      ew_net_6211:
+        aliases:
+          - stack0-eliteew-api-worker-prod
+      ew_net_2847:
+        aliases:
+          - stack0-eliteew-api-worker-prod
+      ew_net_9O11:
+        aliases:
+          - stack0-eliteew-api-worker-prod
+      ew_net_4532:
+        aliases:
+          - stack0-eliteew-api-worker-prod
+      ew_net_7198:
+        aliases:
+          - stack0-eliteew-api-worker-prod
+      ew_net_3365:
+        aliases:
+          - stack0-eliteew-api-worker-prod
+      ew_net_5402:
+        aliases:
+          - stack0-eliteew-api-worker-prod
+    security_opt:
+      - no-new-privileges:true
+      - label=disable
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: "${STACK0_USER:?STACK0_USER not set}"
+    # Queue worker: same CPU venv as API; remote inference only.
+    volumes:
+      - ../../shared/api:/app/api:ro,z
+      - ../../host/generated_files:/app/generated_files:z
+      - ../../host/comfyui:/app/comfyui:ro,z
+      # Rootless Podman: на этом хостовом пути relabel `:z` запрещён (lsetxattr EPERM), используем mount без relabel.
+      - ../data/stack2/airflow/dags:/airflow_dags
+      - ../logs/stack0/eliteew-api-worker-prod:/logs:z
+    environment:
+      - TZ=Asia/Vladivostok
+      - ELITEEW_LOG_FILE=/logs/eliteew-api-worker.log
+      - ELITEEW_LOG_LEVEL=${ELITEEW_LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      # RabbitMQ: по умолчанию не слушаем `site_studio` — его обрабатывает eliteew-site-studio-worker-prod.
+      - QUEUE_WORKER_ALLOWED_QUEUE_KEYS=${QUEUE_WORKER_GENERAL_KEYS:-ai_generation,document_processing,notifications}
+      - BROWSER_RENDER_SIDECAR_PORT=${BROWSER_RENDER_SIDECAR_PORT:-8095}
+      - BROWSER_RENDER_SIDECAR_ENABLED=${BROWSER_RENDER_SIDECAR_ENABLED:-1}
+      - SCIENCE_STACK_SIDECAR_PORT=${SCIENCE_STACK_SIDECAR_PORT:-8096}
+      - SCIENCE_STACK_SIDECAR_ENABLED=${SCIENCE_STACK_SIDECAR_ENABLED:-1}
+      # Как у eliteew-api-prod: явная подстановка из --env-file, без расхождения с «сырым» env_file воркера
+      - ENCRYPTION_ENABLED=${ENCRYPTION_ENABLED}
+      - ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
+      - POSTGRES_EXTERNAL_PORT=30000
+      - REDIS_EXTERNAL_PORT=30001
+      - ELASTICSEARCH_EXTERNAL_PORT=30007
+      - CHROMADB_CONTAINER_NAME=${CHROMADB_CONTAINER_NAME:-stack1-chroma}
+      - CHROMADB_HOST=${CHROMADB_HOST:-stack1-chroma}
+      - CHROMADB_EXTERNAL_HOST=${CHROMADB_EXTERNAL_HOST:-127.0.0.1}
+      - CHROMADB_PORT=${CHROMADB_PORT:-8000}
+      - CHROMADB_EXTERNAL_PORT=${CHROMADB_EXTERNAL_PORT:-30002}
+      - MINIO_HOST=${MINIO_HOST:-stack1-seaweedfs}
+      - MINIO_PORT=${MINIO_PORT:-8333}
+      - MINIO_EXTERNAL_PORT=${MINIO_EXTERNAL_PORT:-30006}
+      - MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT:-30005}
+      - RABBITMQ_CONTAINER_NAME=${RABBITMQ_CONTAINER_NAME:-stack1-rabbitmq}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-stack1-rabbitmq}
+      - RABBITMQ_EXTERNAL_HOST=${RABBITMQ_EXTERNAL_HOST:-127.0.0.1}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_EXTERNAL_PORT=${RABBITMQ_EXTERNAL_PORT:-30008}
+      - RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT:-30009}
+      - RABBITMQ_MANAGEMENT_INTERNAL_PORT=${RABBITMQ_MANAGEMENT_INTERNAL_PORT:-15672}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
+      - RABBITMQ_HEARTBEAT=${RABBITMQ_HEARTBEAT:-60}
+      - RABBITMQ_BLOCKED_CONNECTION_TIMEOUT=${RABBITMQ_BLOCKED_CONNECTION_TIMEOUT:-300}
+      - QDRANT_CONTAINER_NAME=${QDRANT_CONTAINER_NAME:-stack1-qdrant}
+      - QDRANT_HOST=${QDRANT_HOST:-stack1-qdrant}
+      - QDRANT_EXTERNAL_HOST=${QDRANT_EXTERNAL_HOST:-127.0.0.1}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_EXTERNAL_PORT=${QDRANT_EXTERNAL_PORT:-30003}
+      - QDRANT_GRPC_PORT=${QDRANT_GRPC_PORT:-6334}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "/app/smoke/smoke_queue_worker_boot.py"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+
+  # Site Studio — только очередь `site_studio`; runtime выбирается через `ELITEEW_CONTAINER_RUNTIME`.
+  # Podman-only путь: podman + podman-compose предустановлены в image `site-studio-worker`,
+  # compose/provider ходит через user podman socket.
+  # Инвариант: **не** монтировать `/var/run/docker.sock` до отдельного threat-model и записи в runbook.
+  # Временная пауза: profile ``site-studio-worker`` (включать явно после снятия паузы — SITE-STUDIO.md).
+  eliteew-site-studio-worker-prod:
+    profiles: ["site-studio-worker"]
+    image: ${STACK0_SITE_STUDIO_WORKER_IMAGE:-docker.io/library/eliteew-site-studio-worker:v3}
+    container_name: stack0-eliteew-site-studio-worker-prod
+    command: ["python", "-m", "api.workers.queue_worker"]
+    env_file:
+      - ../env_file/.env.stack0.shared
+      - ../env_file/.env.stack0.jobs
+    networks:
+      - ew_net_6211
+      - ew_net_2847
+      - ew_net_9O11
+      - ew_net_4532
+      - ew_net_7198
+      - ew_net_3365
+      - ew_net_5402
+    security_opt:
+      - no-new-privileges:true
+      # podman rootless socket bind (/run/user/*/podman/podman.sock) требует SELinux disable для доступа из контейнера.
+      - label=disable
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: "${STACK0_USER:?STACK0_USER not set}"
+    userns_mode: "keep-id"
+    volumes:
+      - ../../shared/api:/app/api:ro,z
+      - ../../site-templates/olenti:/app/site-templates/olenti:ro,z
+      - ../../host/runtime/user_site_studio:/opt/eliteew/host/runtime/user_site_studio:z
+      # Edge Carrier: script resolves REPO_ROOT via dirname/../.. → builders/site-edge-carrier (needs RW for content staging).
+      - ../../docker/scripts/site-edge-carrier-deploy.sh:/opt/eliteew/docker/scripts/site-edge-carrier-deploy.sh:ro,z
+      - ../../docker/builders/site-edge-carrier:/opt/eliteew/docker/builders/site-edge-carrier:z
+      # Carrier SSH to Edge (.10): host tools until rebaked worker image includes openssh-clients+rsync.
+      - /home/owned/.ssh:/home/owned/.ssh:ro,z
+      - /usr/bin/ssh:/usr/bin/ssh:ro
+      - /usr/bin/scp:/usr/bin/scp:ro
+      - /usr/bin/rsync:/usr/bin/rsync:ro
+      - ../logs/stack0/eliteew-site-studio-worker-prod:/logs:z
+      - /run/user/${SITE_STUDIO_PODMAN_UID}/podman/podman.sock:/run/user/${SITE_STUDIO_PODMAN_UID}/podman/podman.sock
+      # `/var/run/docker.sock` намеренно не монтируется (root на хосте). Политика: STACK0-BACKEND-IMAGES.md.
+    environment:
+      - TZ=Asia/Vladivostok
+      - ELITEEW_LOG_FILE=/logs/eliteew-site-studio-worker.log
+      - ELITEEW_LOG_LEVEL=${ELITEEW_LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      - ELITEEW_CONTAINER_RUNTIME=${ELITEEW_CONTAINER_RUNTIME:-podman}
+      - PODMAN_COMPOSE_PROVIDER=${PODMAN_COMPOSE_PROVIDER:-podman-compose}
+      - CONTAINER_HOST=unix:///run/user/${SITE_STUDIO_PODMAN_UID}/podman/podman.sock
+      - USER_SITE_STUDIO_PODMAN_SOCKET_PATH=/run/user/${SITE_STUDIO_PODMAN_UID}/podman/podman.sock
+      # Podman client XDG; HOME on baked/dev-bind overrides is /home/owned for Carrier SSH only.
+      - XDG_CONFIG_HOME=/var/lib/eliteew/xdg-config
+      - QUEUE_WORKER_ALLOWED_QUEUE_KEYS=${QUEUE_WORKER_SITE_STUDIO_KEYS:-site_studio}
+      - ENCRYPTION_ENABLED=${ENCRYPTION_ENABLED}
+      - ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
+      - POSTGRES_EXTERNAL_PORT=30000
+      - REDIS_EXTERNAL_PORT=30001
+      - USER_SITE_TEMPLATE_ROOT=/app/site-templates/olenti
+      - USER_SITE_STUDIO_RUNTIME_BASE_DIR=/opt/eliteew/host/runtime/user_site_studio
+      - USER_SITE_STUDIO_INTERNAL_HOST=host.docker.internal
+      - USER_SITE_STUDIO_PUBLIC_SCHEME=${USER_SITE_STUDIO_PUBLIC_SCHEME:-https}
+      - USER_SITE_STUDIO_PUBLIC_BASE_DOMAIN=${USER_SITE_STUDIO_PUBLIC_BASE_DOMAIN:-eliteew.ru}
+      - USER_SITE_STUDIO_PUBLIC_HOST_LABEL_SUFFIX=${USER_SITE_STUDIO_PUBLIC_HOST_LABEL_SUFFIX:--site}
+      - USER_SITE_STUDIO_ADMIN_APP_URL=${USER_SITE_STUDIO_ADMIN_APP_URL:-https://app.eliteew.ru}
+      - USER_SITE_STUDIO_DB_SCHEMA_STRATEGY=${USER_SITE_STUDIO_DB_SCHEMA_STRATEGY:-db-push}
+      - USER_SITE_STUDIO_HEALTH_TIMEOUT=${USER_SITE_STUDIO_HEALTH_TIMEOUT:-420}
+      - USER_SITE_STUDIO_HEALTH_POLL=${USER_SITE_STUDIO_HEALTH_POLL:-3}
+      - SITE_STUDIO_OLENTI_API_IMAGE=${SITE_STUDIO_OLENTI_API_IMAGE:-}
+      - SITE_STUDIO_OLENTI_FRONTEND_IMAGE=${SITE_STUDIO_OLENTI_FRONTEND_IMAGE:-}
+      # Literal host mount path (not ${VAR:-}); empty host override must not blank this.
+      - SITE_EDGE_CARRIER_SCRIPT=/opt/eliteew/docker/scripts/site-edge-carrier-deploy.sh
+      # SITE_EDGE_* gates/SSH — via env_file (.env.stack0.jobs); do not ${VAR:-} those here.
+      - ELASTICSEARCH_EXTERNAL_PORT=30007
+      - CHROMADB_CONTAINER_NAME=${CHROMADB_CONTAINER_NAME:-stack1-chroma}
+      - CHROMADB_HOST=${CHROMADB_HOST:-stack1-chroma}
+      - CHROMADB_EXTERNAL_HOST=${CHROMADB_EXTERNAL_HOST:-127.0.0.1}
+      - CHROMADB_PORT=${CHROMADB_PORT:-8000}
+      - CHROMADB_EXTERNAL_PORT=${CHROMADB_EXTERNAL_PORT:-30002}
+      - MINIO_HOST=${MINIO_HOST:-stack1-seaweedfs}
+      - MINIO_PORT=${MINIO_PORT:-8333}
+      - MINIO_EXTERNAL_PORT=${MINIO_EXTERNAL_PORT:-30006}
+      - MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT:-30005}
+      - RABBITMQ_CONTAINER_NAME=${RABBITMQ_CONTAINER_NAME:-stack1-rabbitmq}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-stack1-rabbitmq}
+      - RABBITMQ_EXTERNAL_HOST=${RABBITMQ_EXTERNAL_HOST:-127.0.0.1}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_EXTERNAL_PORT=${RABBITMQ_EXTERNAL_PORT:-30008}
+      - RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT:-30009}
+      - RABBITMQ_MANAGEMENT_INTERNAL_PORT=${RABBITMQ_MANAGEMENT_INTERNAL_PORT:-15672}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
+      - RABBITMQ_HEARTBEAT=${RABBITMQ_HEARTBEAT:-60}
+      - RABBITMQ_BLOCKED_CONNECTION_TIMEOUT=${RABBITMQ_BLOCKED_CONNECTION_TIMEOUT:-300}
+      - QDRANT_CONTAINER_NAME=${QDRANT_CONTAINER_NAME:-stack1-qdrant}
+      - QDRANT_HOST=${QDRANT_HOST:-stack1-qdrant}
+      - QDRANT_EXTERNAL_HOST=${QDRANT_EXTERNAL_HOST:-127.0.0.1}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_EXTERNAL_PORT=${QDRANT_EXTERNAL_PORT:-30003}
+      - QDRANT_GRPC_PORT=${QDRANT_GRPC_PORT:-6334}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "/app/smoke/smoke_queue_worker_boot.py"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+
+  # Celery (брокер Redis) — отдельно от API и от RabbitMQ queue_worker выше.
+  eliteew-celery-worker-prod:
+    profiles: ["punisher-local-workers"]
+    # Falls back to STACK0_API_IMAGE until the split `celery-worker` image is built.
+    # Без runtime nvidia: задачи Celery не используют локальный CUDA (см. STACK0-BACKEND-IMAGES.md).
+    image: ${STACK0_CELERY_WORKER_IMAGE:-docker.io/library/eliteew-celery-worker:v3}
+    container_name: stack0-eliteew-celery-worker-prod
+    command:
+      - python
+      - -m
+      - celery
+      - -A
+      - api.tasks.celery_app
+      - worker
+      - --loglevel=info
+      - -Q
+      - short,maintenance,broadcast,ewa_reembed
+      - --prefetch-multiplier=1
+      - --concurrency=4
+      - --hostname=worker@%h
+      - --max-tasks-per-child=100
+      - --time-limit=600
+      - --soft-time-limit=540
+
+    env_file:
+      - ../env_file/.env.stack0.shared
+      - ../env_file/.env.stack0.jobs
+    networks:
+      - ew_net_6211
+      - ew_net_2847
+      - ew_net_9O11
+      - ew_net_4532
+      - ew_net_7198
+      - ew_net_3365
+      - ew_net_5402
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: "${STACK0_USER:?STACK0_USER not set}"
+    volumes:
+      - ../../shared/api:/app/api:ro,z
+      # Comfy workflow JSON for Celery music generation (Music Evolution / companion music).
+      - ../../host/comfyui:/app/comfyui:ro,z
+      - ../../host/generated_files:/app/generated_files:z
+      - ../logs/stack0/eliteew-celery-worker-prod:/logs:z
+    environment:
+      - TZ=Asia/Vladivostok
+      - ELITEEW_LOG_FILE=/logs/eliteew-celery-worker.log
+      - ELITEEW_LOG_LEVEL=${ELITEEW_LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      - ENCRYPTION_ENABLED=${ENCRYPTION_ENABLED}
+      - ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
+      # Same broker/backend as eliteew-api-prod (CELERY_REDIS_DB from env_file)
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}
+      - CELERY_REDIS_VISIBILITY_TIMEOUT=${CELERY_REDIS_VISIBILITY_TIMEOUT:-3600}
+      - POSTGRES_EXTERNAL_PORT=30000
+      - REDIS_EXTERNAL_PORT=30001
+      - USER_SITE_TEMPLATE_ROOT=/app/site-templates/olenti
+      - USER_SITE_STUDIO_RUNTIME_BASE_DIR=/opt/eliteew/host/runtime/user_site_studio
+      - USER_SITE_STUDIO_INTERNAL_HOST=host.docker.internal
+      - USER_SITE_STUDIO_PUBLIC_SCHEME=${USER_SITE_STUDIO_PUBLIC_SCHEME:-https}
+      - USER_SITE_STUDIO_PUBLIC_BASE_DOMAIN=${USER_SITE_STUDIO_PUBLIC_BASE_DOMAIN:-eliteew.ru}
+      - USER_SITE_STUDIO_PUBLIC_HOST_LABEL_SUFFIX=${USER_SITE_STUDIO_PUBLIC_HOST_LABEL_SUFFIX:--site}
+      - USER_SITE_STUDIO_ADMIN_APP_URL=${USER_SITE_STUDIO_ADMIN_APP_URL:-https://app.eliteew.ru}
+      - USER_SITE_STUDIO_DB_SCHEMA_STRATEGY=${USER_SITE_STUDIO_DB_SCHEMA_STRATEGY:-db-push}
+      - USER_SITE_STUDIO_HEALTH_TIMEOUT=${USER_SITE_STUDIO_HEALTH_TIMEOUT:-420}
+      - USER_SITE_STUDIO_HEALTH_POLL=${USER_SITE_STUDIO_HEALTH_POLL:-3}
+      - SITE_STUDIO_OLENTI_API_IMAGE=${SITE_STUDIO_OLENTI_API_IMAGE:-}
+      - SITE_STUDIO_OLENTI_FRONTEND_IMAGE=${SITE_STUDIO_OLENTI_FRONTEND_IMAGE:-}
+      - ELASTICSEARCH_EXTERNAL_PORT=30007
+      - CHROMADB_CONTAINER_NAME=${CHROMADB_CONTAINER_NAME:-stack1-chroma}
+      - CHROMADB_HOST=${CHROMADB_HOST:-stack1-chroma}
+      - CHROMADB_EXTERNAL_HOST=${CHROMADB_EXTERNAL_HOST:-127.0.0.1}
+      - CHROMADB_PORT=${CHROMADB_PORT:-8000}
+      - CHROMADB_EXTERNAL_PORT=${CHROMADB_EXTERNAL_PORT:-30002}
+      - MINIO_HOST=${MINIO_HOST:-stack1-seaweedfs}
+      - MINIO_PORT=${MINIO_PORT:-8333}
+      - MINIO_EXTERNAL_PORT=${MINIO_EXTERNAL_PORT:-30006}
+      - MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT:-30005}
+      - RABBITMQ_CONTAINER_NAME=${RABBITMQ_CONTAINER_NAME:-stack1-rabbitmq}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-stack1-rabbitmq}
+      - RABBITMQ_EXTERNAL_HOST=${RABBITMQ_EXTERNAL_HOST:-127.0.0.1}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_EXTERNAL_PORT=${RABBITMQ_EXTERNAL_PORT:-30008}
+      - RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT:-30009}
+      - RABBITMQ_MANAGEMENT_INTERNAL_PORT=${RABBITMQ_MANAGEMENT_INTERNAL_PORT:-15672}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
+      - RABBITMQ_HEARTBEAT=${RABBITMQ_HEARTBEAT:-60}
+      - RABBITMQ_BLOCKED_CONNECTION_TIMEOUT=${RABBITMQ_BLOCKED_CONNECTION_TIMEOUT:-300}
+      - QDRANT_CONTAINER_NAME=${QDRANT_CONTAINER_NAME:-stack1-qdrant}
+      - QDRANT_HOST=${QDRANT_HOST:-stack1-qdrant}
+      - QDRANT_EXTERNAL_HOST=${QDRANT_EXTERNAL_HOST:-127.0.0.1}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_EXTERNAL_PORT=${QDRANT_EXTERNAL_PORT:-30003}
+      - QDRANT_GRPC_PORT=${QDRANT_GRPC_PORT:-6334}
+      - COMFYUI_URL=${COMFYUI_URL}
+      - GENERATED_FILES_BASE=${GENERATED_FILES_BASE}
+      - MUSIC_EVOLUTION_DEBUG_JSON_DIR=${MUSIC_EVOLUTION_DEBUG_JSON_DIR:-/app/generated_files/music_evolution_debug_json}
+    restart: unless-stopped
+    # Process liveness only (cheap). Do NOT use celery inspect ping here — cold import +
+    # broker broadcast hammers CPU on a short interval. Deep check: Admin Workers / acceptance.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '[c]elery.*worker' >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
+  eliteew-celery-agentic-worker-prod:
+    profiles: ["punisher-local-workers"]
+    image: ${STACK0_CELERY_WORKER_IMAGE:-docker.io/library/eliteew-celery-worker:v3}
+    container_name: stack0-eliteew-celery-agentic-worker-prod
+    command:
+      - python
+      - -m
+      - celery
+      - -A
+      - api.tasks.celery_app
+      - worker
+      - --loglevel=info
+      - -Q
+      - ewa_agentic,ewa_agentic_step,ewa_factory
+      - --prefetch-multiplier=1
+      - --concurrency=${STACK0_CELERY_AGENTIC_CONCURRENCY:-2}
+      - --hostname=agentic-worker@%h
+      - --max-tasks-per-child=100
+      - --time-limit=960
+      - --soft-time-limit=900
+    env_file:
+      - ../env_file/.env.stack0.shared
+      - ../env_file/.env.stack0.jobs
+    networks:
+      - ew_net_6211
+      - ew_net_2847
+      - ew_net_9O11
+      - ew_net_4532
+      - ew_net_7198
+      - ew_net_3365
+      - ew_net_5402
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: "${STACK0_USER:?STACK0_USER not set}"
+    volumes:
+      - ../../shared/api:/app/api:ro,z
+      - ../../documentation:/app/documentation:ro,z
+      - ../../host/comfyui:/app/comfyui:ro,z
+      - ../../host/generated_files:/app/generated_files:z
+      - ../logs/stack0/eliteew-celery-agentic-worker-prod:/logs:z
+    environment:
+      - TZ=Asia/Vladivostok
+      - ELITEEW_LOG_FILE=/logs/eliteew-celery-agentic-worker.log
+      - ELITEEW_LOG_LEVEL=${ELITEEW_LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}
+      - CELERY_REDIS_VISIBILITY_TIMEOUT=${CELERY_REDIS_VISIBILITY_TIMEOUT:-3600}
+      - POSTGRES_EXTERNAL_PORT=30000
+      - REDIS_EXTERNAL_PORT=30001
+      - USER_SITE_TEMPLATE_ROOT=/app/site-templates/olenti
+      - USER_SITE_STUDIO_RUNTIME_BASE_DIR=/opt/eliteew/host/runtime/user_site_studio
+      - USER_SITE_STUDIO_INTERNAL_HOST=host.docker.internal
+      - USER_SITE_STUDIO_PUBLIC_SCHEME=${USER_SITE_STUDIO_PUBLIC_SCHEME:-https}
+      - USER_SITE_STUDIO_PUBLIC_BASE_DOMAIN=${USER_SITE_STUDIO_PUBLIC_BASE_DOMAIN:-eliteew.ru}
+      - USER_SITE_STUDIO_PUBLIC_HOST_LABEL_SUFFIX=${USER_SITE_STUDIO_PUBLIC_HOST_LABEL_SUFFIX:--site}
+      - USER_SITE_STUDIO_ADMIN_APP_URL=${USER_SITE_STUDIO_ADMIN_APP_URL:-https://app.eliteew.ru}
+      - USER_SITE_STUDIO_DB_SCHEMA_STRATEGY=${USER_SITE_STUDIO_DB_SCHEMA_STRATEGY:-db-push}
+      - USER_SITE_STUDIO_HEALTH_TIMEOUT=${USER_SITE_STUDIO_HEALTH_TIMEOUT:-420}
+      - USER_SITE_STUDIO_HEALTH_POLL=${USER_SITE_STUDIO_HEALTH_POLL:-3}
+      - SITE_STUDIO_OLENTI_API_IMAGE=${SITE_STUDIO_OLENTI_API_IMAGE:-}
+      - SITE_STUDIO_OLENTI_FRONTEND_IMAGE=${SITE_STUDIO_OLENTI_FRONTEND_IMAGE:-}
+      - ELASTICSEARCH_EXTERNAL_PORT=30007
+      - CHROMADB_CONTAINER_NAME=${CHROMADB_CONTAINER_NAME:-stack1-chroma}
+      - CHROMADB_HOST=${CHROMADB_HOST:-stack1-chroma}
+      - CHROMADB_EXTERNAL_HOST=${CHROMADB_EXTERNAL_HOST:-127.0.0.1}
+      - CHROMADB_PORT=${CHROMADB_PORT:-8000}
+      - CHROMADB_EXTERNAL_PORT=${CHROMADB_EXTERNAL_PORT:-30002}
+      - MINIO_HOST=${MINIO_HOST:-stack1-seaweedfs}
+      - MINIO_PORT=${MINIO_PORT:-8333}
+      - MINIO_EXTERNAL_PORT=${MINIO_EXTERNAL_PORT:-30006}
+      - MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT:-30005}
+      - RABBITMQ_CONTAINER_NAME=${RABBITMQ_CONTAINER_NAME:-stack1-rabbitmq}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-stack1-rabbitmq}
+      - RABBITMQ_EXTERNAL_HOST=${RABBITMQ_EXTERNAL_HOST:-127.0.0.1}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_EXTERNAL_PORT=${RABBITMQ_EXTERNAL_PORT:-30008}
+      - RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT:-30009}
+      - RABBITMQ_MANAGEMENT_INTERNAL_PORT=${RABBITMQ_MANAGEMENT_INTERNAL_PORT:-15672}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
+      - RABBITMQ_HEARTBEAT=${RABBITMQ_HEARTBEAT:-60}
+      - RABBITMQ_BLOCKED_CONNECTION_TIMEOUT=${RABBITMQ_BLOCKED_CONNECTION_TIMEOUT:-300}
+      - QDRANT_CONTAINER_NAME=${QDRANT_CONTAINER_NAME:-stack1-qdrant}
+      - QDRANT_HOST=${QDRANT_HOST:-stack1-qdrant}
+      - QDRANT_EXTERNAL_HOST=${QDRANT_EXTERNAL_HOST:-127.0.0.1}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_EXTERNAL_PORT=${QDRANT_EXTERNAL_PORT:-30003}
+      - QDRANT_GRPC_PORT=${QDRANT_GRPC_PORT:-6334}
+      - COMFYUI_URL=${COMFYUI_URL}
+      - GENERATED_FILES_BASE=${GENERATED_FILES_BASE}
+      - MUSIC_EVOLUTION_DEBUG_JSON_DIR=${MUSIC_EVOLUTION_DEBUG_JSON_DIR:-/app/generated_files/music_evolution_debug_json}
+    restart: unless-stopped
+    # Process liveness only (cheap). Do NOT use celery inspect ping here — cold import +
+    # broker broadcast hammers CPU on a short interval. Deep check: Admin Workers / acceptance.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '[c]elery.*worker' >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
+  eliteew-celery-companion-worker-prod:
+    profiles: ["punisher-local-workers"]
+    image: ${STACK0_CELERY_WORKER_IMAGE:-docker.io/library/eliteew-celery-worker:v3}
+    container_name: stack0-eliteew-celery-companion-worker-prod
+    command:
+      - python
+      - -m
+      - celery
+      - -A
+      - api.tasks.celery_app
+      - worker
+      - --loglevel=info
+      - -Q
+      - ewa_companion
+      - --prefetch-multiplier=1
+      - --concurrency=${STACK0_CELERY_COMPANION_CONCURRENCY:-2}
+      - --hostname=companion-worker@%h
+      - --max-tasks-per-child=100
+      - --time-limit=600
+      - --soft-time-limit=540
+    env_file:
+      - ../env_file/.env.stack0.shared
+      - ../env_file/.env.stack0.jobs
+    networks:
+      - ew_net_6211
+      - ew_net_2847
+      - ew_net_9O11
+      - ew_net_4532
+      - ew_net_7198
+      - ew_net_3365
+      - ew_net_5402
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: "${STACK0_USER:?STACK0_USER not set}"
+    volumes:
+      - ../../shared/api:/app/api:ro,z
+      - ../../host/comfyui:/app/comfyui:ro,z
+      - ../../host/generated_files:/app/generated_files:z
+      - ../logs/stack0/eliteew-celery-companion-worker-prod:/logs:z
+    environment:
+      - TZ=Asia/Vladivostok
+      - ELITEEW_LOG_FILE=/logs/eliteew-celery-companion-worker.log
+      - ELITEEW_LOG_LEVEL=${ELITEEW_LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      # Same broker/backend as eliteew-api-prod (CELERY_REDIS_DB from env_file)
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}
+      - CELERY_REDIS_VISIBILITY_TIMEOUT=${CELERY_REDIS_VISIBILITY_TIMEOUT:-3600}
+      - POSTGRES_EXTERNAL_PORT=30000
+      - REDIS_EXTERNAL_PORT=30001
+      - USER_SITE_TEMPLATE_ROOT=/app/site-templates/olenti
+      - USER_SITE_STUDIO_RUNTIME_BASE_DIR=/opt/eliteew/host/runtime/user_site_studio
+      - USER_SITE_STUDIO_INTERNAL_HOST=host.docker.internal
+      - USER_SITE_STUDIO_PUBLIC_SCHEME=${USER_SITE_STUDIO_PUBLIC_SCHEME:-https}
+      - USER_SITE_STUDIO_PUBLIC_BASE_DOMAIN=${USER_SITE_STUDIO_PUBLIC_BASE_DOMAIN:-eliteew.ru}
+      - USER_SITE_STUDIO_PUBLIC_HOST_LABEL_SUFFIX=${USER_SITE_STUDIO_PUBLIC_HOST_LABEL_SUFFIX:--site}
+      - USER_SITE_STUDIO_ADMIN_APP_URL=${USER_SITE_STUDIO_ADMIN_APP_URL:-https://app.eliteew.ru}
+      - USER_SITE_STUDIO_DB_SCHEMA_STRATEGY=${USER_SITE_STUDIO_DB_SCHEMA_STRATEGY:-db-push}
+      - USER_SITE_STUDIO_HEALTH_TIMEOUT=${USER_SITE_STUDIO_HEALTH_TIMEOUT:-420}
+      - USER_SITE_STUDIO_HEALTH_POLL=${USER_SITE_STUDIO_HEALTH_POLL:-3}
+      - SITE_STUDIO_OLENTI_API_IMAGE=${SITE_STUDIO_OLENTI_API_IMAGE:-}
+      - SITE_STUDIO_OLENTI_FRONTEND_IMAGE=${SITE_STUDIO_OLENTI_FRONTEND_IMAGE:-}
+      - ELASTICSEARCH_EXTERNAL_PORT=30007
+      - CHROMADB_CONTAINER_NAME=${CHROMADB_CONTAINER_NAME:-stack1-chroma}
+      - CHROMADB_HOST=${CHROMADB_HOST:-stack1-chroma}
+      - CHROMADB_EXTERNAL_HOST=${CHROMADB_EXTERNAL_HOST:-127.0.0.1}
+      - CHROMADB_PORT=${CHROMADB_PORT:-8000}
+      - CHROMADB_EXTERNAL_PORT=${CHROMADB_EXTERNAL_PORT:-30002}
+      - MINIO_HOST=${MINIO_HOST:-stack1-seaweedfs}
+      - MINIO_PORT=${MINIO_PORT:-8333}
+      - MINIO_EXTERNAL_PORT=${MINIO_EXTERNAL_PORT:-30006}
+      - MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT:-30005}
+      - RABBITMQ_CONTAINER_NAME=${RABBITMQ_CONTAINER_NAME:-stack1-rabbitmq}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-stack1-rabbitmq}
+      - RABBITMQ_EXTERNAL_HOST=${RABBITMQ_EXTERNAL_HOST:-127.0.0.1}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_EXTERNAL_PORT=${RABBITMQ_EXTERNAL_PORT:-30008}
+      - RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT:-30009}
+      - RABBITMQ_MANAGEMENT_INTERNAL_PORT=${RABBITMQ_MANAGEMENT_INTERNAL_PORT:-15672}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
+      - RABBITMQ_HEARTBEAT=${RABBITMQ_HEARTBEAT:-60}
+      - RABBITMQ_BLOCKED_CONNECTION_TIMEOUT=${RABBITMQ_BLOCKED_CONNECTION_TIMEOUT:-300}
+      - QDRANT_CONTAINER_NAME=${QDRANT_CONTAINER_NAME:-stack1-qdrant}
+      - QDRANT_HOST=${QDRANT_HOST:-stack1-qdrant}
+      - QDRANT_EXTERNAL_HOST=${QDRANT_EXTERNAL_HOST:-127.0.0.1}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_EXTERNAL_PORT=${QDRANT_EXTERNAL_PORT:-30003}
+      - QDRANT_GRPC_PORT=${QDRANT_GRPC_PORT:-6334}
+      - COMFYUI_URL=${COMFYUI_URL}
+      - GENERATED_FILES_BASE=${GENERATED_FILES_BASE}
+      - MUSIC_EVOLUTION_DEBUG_JSON_DIR=${MUSIC_EVOLUTION_DEBUG_JSON_DIR:-/app/generated_files/music_evolution_debug_json}
+    restart: unless-stopped
+    # Process liveness only (cheap). Do NOT use celery inspect ping here — cold import +
+    # broker broadcast hammers CPU on a short interval. Deep check: Admin Workers / acceptance.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '[c]elery.*worker' >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
+  eliteew-celery-discussion-worker-prod:
+    profiles: ["punisher-local-workers"]
+    image: ${STACK0_CELERY_WORKER_IMAGE:-docker.io/library/eliteew-celery-worker:v3}
+    container_name: stack0-eliteew-celery-discussion-worker-prod
+    command:
+      - python
+      - -m
+      - celery
+      - -A
+      - api.tasks.celery_app
+      - worker
+      - --loglevel=info
+      - -Q
+      - desktop_discussion
+      - --prefetch-multiplier=1
+      - --concurrency=${STACK0_CELERY_DISCUSSION_CONCURRENCY:-2}
+      - --hostname=discussion-worker@%h
+      - --max-tasks-per-child=100
+      - --time-limit=600
+      - --soft-time-limit=540
+    env_file:
+      - ../env_file/.env.stack0.shared
+      - ../env_file/.env.stack0.jobs
+    networks:
+      - ew_net_6211
+      - ew_net_2847
+      - ew_net_9O11
+      - ew_net_4532
+      - ew_net_7198
+      - ew_net_3365
+      - ew_net_5402
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: "${STACK0_USER:?STACK0_USER not set}"
+    volumes:
+      - ../../shared/api:/app/api:ro,z
+      - ../../host/comfyui:/app/comfyui:ro,z
+      - ../../host/generated_files:/app/generated_files:z
+      - ../logs/stack0/eliteew-celery-discussion-worker-prod:/logs:z
+    environment:
+      - TZ=Asia/Vladivostok
+      - ELITEEW_LOG_FILE=/logs/eliteew-celery-discussion-worker.log
+      - ELITEEW_LOG_LEVEL=${ELITEEW_LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      # Same broker/backend as eliteew-api-prod (CELERY_REDIS_DB from env_file)
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}
+      - CELERY_REDIS_VISIBILITY_TIMEOUT=${CELERY_REDIS_VISIBILITY_TIMEOUT:-3600}
+      - POSTGRES_EXTERNAL_PORT=30000
+      - REDIS_EXTERNAL_PORT=30001
+      # Celery autodiscover imports agentic/tasks → DatabaseConfig requires these ports
+      - ELASTICSEARCH_EXTERNAL_PORT=30007
+      - CHROMADB_CONTAINER_NAME=${CHROMADB_CONTAINER_NAME:-stack1-chroma}
+      - CHROMADB_HOST=${CHROMADB_HOST:-stack1-chroma}
+      - CHROMADB_EXTERNAL_HOST=${CHROMADB_EXTERNAL_HOST:-127.0.0.1}
+      - CHROMADB_PORT=${CHROMADB_PORT:-8000}
+      - CHROMADB_EXTERNAL_PORT=${CHROMADB_EXTERNAL_PORT:-30002}
+      - MINIO_HOST=${MINIO_HOST:-stack1-seaweedfs}
+      - MINIO_PORT=${MINIO_PORT:-8333}
+      - MINIO_EXTERNAL_PORT=${MINIO_EXTERNAL_PORT:-30006}
+      - MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT:-30005}
+      - RABBITMQ_CONTAINER_NAME=${RABBITMQ_CONTAINER_NAME:-stack1-rabbitmq}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-stack1-rabbitmq}
+      - RABBITMQ_EXTERNAL_HOST=${RABBITMQ_EXTERNAL_HOST:-127.0.0.1}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_EXTERNAL_PORT=${RABBITMQ_EXTERNAL_PORT:-30008}
+      - RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT:-30009}
+      - RABBITMQ_MANAGEMENT_INTERNAL_PORT=${RABBITMQ_MANAGEMENT_INTERNAL_PORT:-15672}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
+      - RABBITMQ_HEARTBEAT=${RABBITMQ_HEARTBEAT:-60}
+      - RABBITMQ_BLOCKED_CONNECTION_TIMEOUT=${RABBITMQ_BLOCKED_CONNECTION_TIMEOUT:-300}
+      - QDRANT_CONTAINER_NAME=${QDRANT_CONTAINER_NAME:-stack1-qdrant}
+      - QDRANT_HOST=${QDRANT_HOST:-stack1-qdrant}
+      - QDRANT_EXTERNAL_HOST=${QDRANT_EXTERNAL_HOST:-127.0.0.1}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_EXTERNAL_PORT=${QDRANT_EXTERNAL_PORT:-30003}
+      - QDRANT_GRPC_PORT=${QDRANT_GRPC_PORT:-6334}
+      - COMFYUI_URL=${COMFYUI_URL}
+      - GENERATED_FILES_BASE=${GENERATED_FILES_BASE}
+    restart: unless-stopped
+    # Process liveness only (cheap). Do NOT use celery inspect ping here — cold import +
+    # broker broadcast hammers CPU on a short interval. Deep check: Admin Workers / acceptance.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '[c]elery.*worker' >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
+  # Ровно один экземпляр beat (иначе периодические задачи дублируются).
+  eliteew-celery-beat-prod:
+    # Falls back to STACK0_API_IMAGE until the split `celery-beat` image is built.
+    image: ${STACK0_CELERY_BEAT_IMAGE:-docker.io/library/eliteew-celery-beat:v3}
+    container_name: stack0-eliteew-celery-beat-prod
+    command:
+      - python
+      - -m
+      - celery
+      - -A
+      - api.tasks.celery_app
+      - beat
+      - --loglevel=info
+      - --pidfile=/tmp/celerybeat.pid
+    env_file:
+      - ../env_file/.env.stack0.shared
+      - ../env_file/.env.stack0.jobs
+    networks:
+      - ew_net_6211
+      - ew_net_2847
+      - ew_net_9O11
+      - ew_net_4532
+      - ew_net_7198
+      - ew_net_3365
+      - ew_net_5402
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: "${STACK0_USER:?STACK0_USER not set}"
+    volumes:
+      - ../../shared/api:/app/api:ro,z
+      - ../logs/stack0/eliteew-celery-beat-prod:/logs:z
+    environment:
+      - TZ=Asia/Vladivostok
+      - ELITEEW_LOG_FILE=/logs/eliteew-celery-beat.log
+      - ELITEEW_LOG_LEVEL=${ELITEEW_LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${CELERY_REDIS_DB}
+      - POSTGRES_EXTERNAL_PORT=30000
+      - REDIS_EXTERNAL_PORT=30001
+      - ELASTICSEARCH_EXTERNAL_PORT=30007
+      - CHROMADB_CONTAINER_NAME=${CHROMADB_CONTAINER_NAME:-stack1-chroma}
+      - CHROMADB_HOST=${CHROMADB_HOST:-stack1-chroma}
+      - CHROMADB_EXTERNAL_HOST=${CHROMADB_EXTERNAL_HOST:-127.0.0.1}
+      - CHROMADB_PORT=${CHROMADB_PORT:-8000}
+      - CHROMADB_EXTERNAL_PORT=${CHROMADB_EXTERNAL_PORT:-30002}
+      - MINIO_HOST=${MINIO_HOST:-stack1-seaweedfs}
+      - MINIO_PORT=${MINIO_PORT:-8333}
+      - MINIO_EXTERNAL_PORT=${MINIO_EXTERNAL_PORT:-30006}
+      - MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT:-30005}
+      - RABBITMQ_CONTAINER_NAME=${RABBITMQ_CONTAINER_NAME:-stack1-rabbitmq}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-stack1-rabbitmq}
+      - RABBITMQ_EXTERNAL_HOST=${RABBITMQ_EXTERNAL_HOST:-127.0.0.1}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_EXTERNAL_PORT=${RABBITMQ_EXTERNAL_PORT:-30008}
+      - RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT:-30009}
+      - RABBITMQ_MANAGEMENT_INTERNAL_PORT=${RABBITMQ_MANAGEMENT_INTERNAL_PORT:-15672}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
+      - RABBITMQ_HEARTBEAT=${RABBITMQ_HEARTBEAT:-60}
+      - RABBITMQ_BLOCKED_CONNECTION_TIMEOUT=${RABBITMQ_BLOCKED_CONNECTION_TIMEOUT:-300}
+      - QDRANT_CONTAINER_NAME=${QDRANT_CONTAINER_NAME:-stack1-qdrant}
+      - QDRANT_HOST=${QDRANT_HOST:-stack1-qdrant}
+      - QDRANT_EXTERNAL_HOST=${QDRANT_EXTERNAL_HOST:-127.0.0.1}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_EXTERNAL_PORT=${QDRANT_EXTERNAL_PORT:-30003}
+      - QDRANT_GRPC_PORT=${QDRANT_GRPC_PORT:-6334}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '[c]elery.*beat' >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

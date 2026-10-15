@@ -1,0 +1,36 @@
+{
+  "$id": "iacpack.schemas.cli.v1.apply",
+  "title": "iacpack apply command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "iacpack.cli/v1" },
+    "command": { "type": "string", "const": "apply" },
+    "ok": { "type": "boolean" },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["project", "instance", "providerSlug"],
+          "properties": {
+            "project": { "type": "string" },
+            "instance": { "type": "string" },
+            "providerSlug": { "type": "string" },
+            "noop": { "type": "boolean" },
+            "runId": { "type": "string" },
+            "semanticHash": { "type": "string" },
+            "bundleDigest": { "type": "string" },
+            "actions": { "type": "integer" }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "iacpack.schemas.cli.v1.diagnostics" }
+    }
+  }
+}

@@ -1,0 +1,978 @@
+openapi: 3.1.0
+info:
+  title: iacpack local authoring API
+  version: 0.1.0
+  description: Loopback-only authoring API. No deploy/apply endpoints.
+servers:
+  - url: http://127.0.0.1:7432
+    description: Default loopback
+paths:
+  /api/v1/health:
+    get:
+      operationId: getHealth
+      summary: Liveness
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /api/v1/projects:
+    get:
+      operationId: listProjects
+      summary: List projects under the studio root
+      description: |
+        The process workspace is the studio root. Each project is that root
+        or a child directory projects/<id>/ with its own iacpack.yaml.
+        Clients cannot pass absolute host paths.
+      responses:
+        "200":
+          description: Project list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+    post:
+      operationId: createProject
+      summary: Create a project directory and switch to it
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: Directory id ^[a-z][a-z0-9-]{0,62}$
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/projects/select:
+    post:
+      operationId: selectProject
+      summary: Switch the active project directory
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id]
+              properties:
+                id: { type: string }
+      responses:
+        "200":
+          description: Active project changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/workspace:
+    get:
+      operationId: getWorkspaceInfo
+      summary: Loopback workspace paths for CLI follow-up
+      responses:
+        "200":
+          description: Workspace metadata (no secrets)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceInfo"
+  /api/v1/schema/manifest:
+    get:
+      operationId: getManifestSchema
+      summary: Embedded manifest JSON Schema
+      responses:
+        "200":
+          description: Schema document
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/manifest:
+    get:
+      operationId: getManifest
+      summary: Load configured manifest
+      responses:
+        "200":
+          description: Manifest text
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/yaml:
+              schema: { type: string }
+            application/json:
+              schema: { type: object }
+        "404":
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: putManifest
+      summary: Atomic save with If-Match / If-None-Match
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/IfNoneMatch"
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/yaml:
+            schema: { type: string }
+          text/yaml:
+            schema: { type: string }
+      responses:
+        "200":
+          description: Saved
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveResult"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+  /api/v1/workspace/files:
+    get:
+      operationId: listWorkspaceFiles
+      summary: List one workspace directory
+      description: |
+        One directory level. Skips symlinks, `.git`, and `.env` names. No file bytes.
+      parameters:
+        - name: dir
+          in: query
+          required: false
+          schema: { type: string }
+          description: Workspace-relative directory. Empty lists the root.
+      responses:
+        "200":
+          description: Directory listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/workspace/upload:
+    post:
+      operationId: workspaceUpload
+      summary: Upload files, directory trees, or zip archives into the workspace
+      description: |
+        Explicit authoring helper for import UI. Modes: `file` (single target path),
+        `tree` (files with relative paths under target dir), `zip` (extract under target).
+        Rejects traversal, symlinks, `.env`, and docker.sock paths.
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [mode, target]
+              properties:
+                mode:
+                  type: string
+                  enum: [file, tree, zip, tar]
+                target:
+                  type: string
+                  description: Workspace-relative file or directory root
+                overwrite:
+                  type: boolean
+                contentBase64:
+                  type: string
+                  description: File or zip bytes (file/zip modes)
+                files:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [path, contentBase64]
+                    properties:
+                      path: { type: string }
+                      contentBase64: { type: string }
+      responses:
+        "200":
+          description: Upload result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        "422":
+          description: Refused paths or quota
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /api/v1/manifest/save-as:
+    post:
+      operationId: saveAsManifest
+      summary: Workspace-contained no-overwrite Save As
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveAsRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveResult"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /api/v1/export/manifest:
+    post:
+      operationId: exportManifest
+      summary: Canonical semantic export
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      responses:
+        "200":
+          description: Canonical JSON
+          content:
+            application/json:
+              schema: { type: object }
+  /api/v1/validate:
+    post:
+      operationId: validateManifest
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValuesBody"
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+  /api/v1/inspect/graph:
+    post:
+      operationId: inspectGraph
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      responses:
+        "200":
+          description: Graph
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+  /api/v1/preview/compose:
+    post:
+      operationId: previewCompose
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValuesBody"
+      responses:
+        "200":
+          description: Compose preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+  /api/v1/preview/artifacts:
+    post:
+      operationId: previewArtifacts
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      responses:
+        "200":
+          description: Artifact tree listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+  /api/v1/lock:
+    post:
+      operationId: lockManifest
+      summary: Write/update workspace lockfile for the configured manifest
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      responses:
+        "200":
+          description: Lock result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+  /api/v1/builds:
+    post:
+      operationId: startBuild
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuildRequest"
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildJob"
+        "429":
+          $ref: "#/components/responses/Problem"
+  /api/v1/builds/{id}:
+    get:
+      operationId: getBuild
+      parameters:
+        - $ref: "#/components/parameters/BuildID"
+      responses:
+        "200":
+          description: Build status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildJob"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: cancelBuild
+      parameters:
+        - $ref: "#/components/parameters/BuildID"
+        - $ref: "#/components/parameters/CSRF"
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildJob"
+  /api/v1/builds/{id}/events:
+    get:
+      operationId: buildEvents
+      parameters:
+        - $ref: "#/components/parameters/BuildID"
+      responses:
+        "200":
+          description: SSE event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+  /api/v1/manifest/events:
+    get:
+      operationId: manifestEvents
+      summary: Manifest filesystem events (poll watcher, SSE)
+      description: |
+        Streams versioned ManifestEvent payloads (revision only). Supports
+        Last-Event-ID resume from a bounded buffer; overflow emits resyncRequired.
+      responses:
+        "200":
+          description: SSE event stream (event name manifest)
+          content:
+            text/event-stream:
+              schema: { type: string }
+  /api/v1/inputs:
+    get:
+      operationId: listInputs
+      responses:
+        "200":
+          description: Declared inputs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+  /api/v1/discover:
+    get:
+      operationId: discoverWorkspace
+      summary: Reviewable workspace discovery suggestions
+      description: |
+        Same deterministic scan as `inspect --discover` / `init --discover`.
+        Returns well-known paths (Dockerfile*, compose.yaml/yml, compose.*,
+        docker-compose.*, stack*.yml|yaml, Caddyfile, nginx.conf) up to depth 3.
+        Suggestions never mutate the workspace or build inputs (ADR-017).
+      responses:
+        "200":
+          description: Discovery suggestions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+  /api/v1/import/propose:
+    post:
+      operationId: importPropose
+      summary: Propose a reviewable Project draft from Compose/Dockerfile
+      description: |
+        Builds a draft Project from workspace-relative Compose (primary) and/or
+        Dockerfile paths (secondary). Never writes the workspace (ADR-016/018).
+        Result includes parameterGaps, secretSuggestions (declaration stubs only),
+        and a placeholder-only envExample preview. Accept/apply stubs and Save
+        are explicit client actions.
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                compose:
+                  type: string
+                  description: Workspace-relative Compose path (legacy single)
+                composes:
+                  type: array
+                  items: { type: string }
+                  description: Ordered workspace-relative Compose paths (first-wins merge)
+                dockerfiles:
+                  type: array
+                  items: { type: string }
+                name:
+                  type: string
+                  description: Optional metadata.name for the draft
+                activeProfiles:
+                  type: array
+                  items: { type: string }
+                  description: |
+                    Compose profile names (same semantics as COMPOSE_PROFILES /
+                    docker compose --profile). Empty omits profile-gated services
+                    with info diagnostics (ADR-020 §6).
+                strict:
+                  type: boolean
+                  description: |
+                    When true, policy-denied fields on included services are
+                    errors (CI gate); default false treats them as warnings and
+                    excludes the service (ADR-020 §7).
+                existingProject:
+                  type: object
+                  additionalProperties: true
+                  description: |
+                    Prior draft Project. service.user values already set there
+                    are kept; image Config.User does not overwrite them.
+      responses:
+        "200":
+          description: Draft produced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        "422":
+          description: Draft refused or empty after policy denials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /api/v1/import/prepare:
+    post:
+      operationId: importPrepare
+      summary: Write draft JSON and create workspace stubs in one step
+      description: |
+        Combines `import/write-draft` (canonical JSON) and `import/resource-stubs`
+        for operator/CLI workflows. Never writes secrets or `.env` content.
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [project]
+              properties:
+                project: { type: object }
+                path:
+                  type: string
+                  description: Workspace-relative draft JSON path
+                replace:
+                  type: boolean
+                  description: Overwrite existing draft file at path
+      responses:
+        "200":
+          description: Prepared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        "422":
+          description: Refused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /api/v1/import/write-draft:
+    post:
+      operationId: importWriteDraft
+      summary: Write import draft Project JSON into the workspace
+      description: |
+        Explicit authoring helper for CLI `import stub-preview` / `import resource-stubs`.
+        Writes canonical JSON (JCS); default path `imports/import-draft.json`.
+        Never writes secret values or populated `.env` files.
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [project]
+              properties:
+                project: { type: object }
+                path:
+                  type: string
+                  description: Workspace-relative JSON path (default imports/import-draft.json)
+                replace:
+                  type: boolean
+                  description: When true, overwrite an existing file at path
+      responses:
+        "201":
+          description: Draft written
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        "409":
+          description: Path already exists and replace was false
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        "422":
+          description: Refused path or invalid project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /api/v1/import/stub-preview:
+    post:
+      operationId: importStubPreview
+      summary: Preview workspace stubs for an import draft (no writes)
+      description: |
+        Dry-run for `import/resource-stubs`. Lists directories, placeholder files,
+        and build contexts that would be created from the draft Project JSON.
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [project]
+              properties:
+                project: { type: object }
+                bindChoices:
+                  type: array
+                  description: Remap bind resources to existing workspace paths before preview/prepare.
+                  items:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      resourceId: { type: string }
+                      imageId: { type: string }
+                      mode: { type: string, enum: [stub, existing] }
+                      path: { type: string }
+      responses:
+        "200":
+          description: Preview plan (result may include bindItems, project, pathDiagnostics)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        "422":
+          description: Refused paths
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /api/v1/import/resource-stubs:
+    post:
+      operationId: importResourceStubs
+      summary: Create workspace stubs for bind resources and image build contexts
+      description: |
+        Explicit authoring helper for Compose import drafts. Creates missing
+        directories for `spec.resources` bind sources, missing `spec.images/*/build/context`
+        directories, and when needed empty placeholder files for file-shaped binds.
+        Never writes secret values or `.env` content.
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [project]
+              properties:
+                project: { type: object }
+      responses:
+        "200":
+          description: Stubs created (partial skips allowed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        "422":
+          description: Refused paths
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /api/v1/import/onboard:
+    post:
+      operationId: importOnboard
+      summary: Apply selected secret/parameter onboarding stubs to a draft Project
+      description: |
+        Merges selected secret declarations (and optional mounts / non-secret
+        parameter defaults) into an in-memory Project. Never accepts secret
+        values. Optional write of workspace `.env.example` placeholders only
+        (ADR-018).
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [project]
+              properties:
+                project: { type: object }
+                secretIds:
+                  type: array
+                  items: { type: string }
+                suggestions:
+                  type: array
+                  items: { type: object }
+                paramDefaults:
+                  type: object
+                  additionalProperties: true
+                attachMounts: { type: boolean }
+                writeEnvExample: { type: boolean }
+      responses:
+        "200":
+          description: Stubs applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        "422":
+          description: Apply refused
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /api/v1/import/env-example:
+    post:
+      operationId: importEnvExample
+      summary: Preview or write placeholder-only .env.example
+      description: |
+        Builds `.env.example` placeholders from a Project draft and optional
+        secret ids. Never writes secret values. Write requires explicit write=true
+        and only creates `.env.example` (never `.env`).
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                project: { type: object }
+                secretIds:
+                  type: array
+                  items: { type: string }
+                write: { type: boolean }
+      responses:
+        "200":
+          description: Placeholder text (and optional write path)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /api/v1/release/templates/propose:
+    post:
+      operationId: releaseTemplatesPropose
+      summary: Preview GitHub release helper templates (no write)
+      description: |
+        Plans opted-in CI/release helper files under the workspace (ADR-019).
+        Never writes disk, never pushes, never calls gh or network publish.
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                force: { type: boolean }
+      responses:
+        "200":
+          description: Planned files
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        "422":
+          description: Plan refused (e.g. overwrite without force)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /api/v1/release/templates/write:
+    post:
+      operationId: releaseTemplatesWrite
+      summary: Write GitHub release helper templates
+      description: |
+        Explicit authoring write of documented template paths only (ADR-019).
+        Refuses overwrite unless force=true. Never publishes, pushes, or calls gh.
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                force: { type: boolean }
+      responses:
+        "200":
+          description: Templates written
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        "422":
+          description: Write refused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /api/v1/secrets/generate:
+    post:
+      operationId: generateSecretFile
+      summary: Write a generated secret file into the workspace
+      description: |
+        Writes `secrets/<id>` (file mode 0600, directory 0700). `kind` is
+        `password`, `port`, or `name`. The response contains the id and the
+        relative path only — never the file bytes. A request that includes a
+        value is rejected. An existing file is replaced only when `replace` is
+        true. The manifest is not modified.
+      parameters:
+        - $ref: "#/components/parameters/CSRF"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id, kind]
+              properties:
+                id:
+                  type: string
+                  description: Manifest secret id (`^[a-z][a-z0-9-]{0,62}$`)
+                kind:
+                  type: string
+                  enum: [password, port, name]
+                replace:
+                  type: boolean
+                  description: Replace an existing secrets/<id> file
+      responses:
+        "200":
+          description: File written; result has id, kind, path, replaced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResult"
+        "409":
+          description: File already exists and replace is false
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+components:
+  parameters:
+    IfMatch:
+      name: If-Match
+      in: header
+      schema: { type: string }
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      schema: { type: string }
+    CSRF:
+      name: X-Iacpack-CSRF
+      in: header
+      required: true
+      schema: { type: string }
+    BuildID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    Problem:
+      description: RFC 9457 Problem Details
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    Health:
+      type: object
+      required: [ok, product, version]
+      properties:
+        ok: { type: boolean }
+        product: { type: string }
+        version: { type: string }
+    WorkspaceInfo:
+      type: object
+      required: [workspace, manifest, outputRoot]
+      properties:
+        workspace: { type: string, description: Absolute workspace directory }
+        manifest: { type: string, description: Workspace-relative manifest path }
+        outputRoot: { type: string, description: Workspace-relative build output root }
+    SaveResult:
+      type: object
+      required: [path, etag, revision]
+      properties:
+        path: { type: string }
+        etag: { type: string }
+        revision: { type: string }
+    SaveAsRequest:
+      type: object
+      required: [path, content]
+      properties:
+        path: { type: string, description: Workspace-relative path }
+        content: { type: string }
+    ValuesBody:
+      type: object
+      additionalProperties: true
+      properties:
+        set:
+          type: object
+          additionalProperties: { type: string }
+        values:
+          type: object
+          additionalProperties: true
+    CommandResult:
+      type: object
+      required: [ok, result, diagnostics]
+      properties:
+        ok: { type: boolean }
+        result: {}
+        diagnostics:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    BuildRequest:
+      type: object
+      properties:
+        format: { type: string, enum: [directory, bundle] }
+        output: { type: string, description: Workspace-relative output path }
+    BuildJob:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [queued, running, succeeded, failed, cancelled] }
+        output: { type: string }
+        diagnostics:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    ManifestEvent:
+      type: object
+      required: [kind, revision]
+      properties:
+        kind:
+          type: string
+          enum: [changed, invalid, deleted, permissionDenied, resyncRequired]
+        revision: { type: string }
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        diagnostics:
+          type: array
+          items:
+            type: object
+            additionalProperties: true

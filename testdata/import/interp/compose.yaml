@@ -1,0 +1,6 @@
+services:
+  api:
+    image: docker.io/library/nginx@sha256:0000000000000000000000000000000000000000000000000000000000000001
+    environment:
+      HOST: "${PUBLIC_HOST}"
+      DB_PASSWORD: "${DB_PASSWORD}"

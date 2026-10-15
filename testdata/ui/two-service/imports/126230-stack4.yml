@@ -1,0 +1,194 @@
+# =============================================================================
+# EliteEW · stack4 — OCR/извлечение и Paperless (Tika, OCR, Gotenberg, Tesseract, Paperless-ngx)
+# =============================================================================
+# Запуск из корня репо:
+#   docker compose -f docker/stack/stack4.yml --env-file docker/env_file/.env.stack4 up -d
+#
+# Сети: ew_net_7198 (внутренняя изоляция stack4), ew_net_2847 (доступ к stack1 Postgres для Paperless).
+# =============================================================================
+name: stack4
+networks:
+  ew_net_7198:
+    external: true
+  ew_net_2847:
+    external: true
+
+services:
+  # 1. Tika Server - извлечение текста; логи в /logs через обёртку
+  tika:
+    image: apache/tika:3.3.1.0
+    container_name: stack4-tika
+    user: "${STACK4_USER:?STACK4_USER not set}"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=Asia/Vladivostok
+      - JAVA_TOOL_OPTIONS=-Xmx1024m
+    networks: [ew_net_7198]
+    ports:
+      - "127.0.0.1:${STACK4_TIKA_HOST_PORT:?STACK4_TIKA_HOST_PORT not set}:9998"
+    entrypoint: ["/usr/local/bin/log-to-file.sh"]
+    command: ["/logs/tika.log", "sh", "-c", "exec java -jar $(ls /tika-server*.jar 2>/dev/null | head -1) -h 0.0.0.0"]
+    volumes:
+      - ../logs/stack4/tika:/logs:z
+      - ../scripts/log-to-file.sh:/usr/local/bin/log-to-file.sh:ro,z
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+        reservations:
+          memory: 512M
+    # Проверка что HTTP слушает 9998 (образ без curl/wget; java -h запускал отдельный JVM)
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c 'echo > /dev/tcp/127.0.0.1/9998' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # 2. OCRmyPDF API; логи в /logs (образ: Flask app.py, venv без gunicorn — запуск через python)
+  ocrmypdf-api:
+    build:
+      context: ../builders/stack4-ocrmypdf
+      dockerfile: Dockerfile
+    image: stack4-ocrmypdf-api:latest
+    container_name: stack4-ocrmypdf-api
+    user: "${STACK4_USER:?STACK4_USER not set}"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: Asia/Vladivostok
+    networks: [ew_net_7198]
+    ports:
+      - "127.0.0.1:${STACK4_OCRMYPDF_HOST_PORT:?STACK4_OCRMYPDF_HOST_PORT not set}:5000"
+    entrypoint: ["/usr/local/bin/log-to-file.sh"]
+    command: ["/logs/ocrmypdf.log", "/app/.venv/bin/python", "app.py"]
+    volumes:
+      - ../logs/stack4/ocrmypdf-api:/logs:z
+      - ../scripts/log-to-file.sh:/usr/local/bin/log-to-file.sh:ro,z
+    working_dir: /app
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # 3. Gotenberg - продвинутая конвертация (HTML/PDF и др.); логи в /logs через обёртку
+  gotenberg:
+    image: gotenberg/gotenberg:8.33.0
+    container_name: stack4-gotenberg
+    user: "${STACK4_USER:?STACK4_USER not set}"
+    security_opt:
+      - no-new-privileges:true
+    networks: [ew_net_7198]
+    ports:
+      - "127.0.0.1:${STACK4_GOTENBERG_HOST_PORT:?STACK4_GOTENBERG_HOST_PORT not set}:3000"
+    environment:
+      - TZ=Asia/Vladivostok
+      - XDG_CONFIG_HOME=/tmp
+      - XDG_CACHE_HOME=/tmp
+    entrypoint: ["/usr/local/bin/log-to-file.sh"]
+    command: ["/logs/gotenberg.log", "gotenberg"]
+    volumes:
+      - ../logs/stack4/gotenberg:/logs:z
+      - ../scripts/log-to-file.sh:/usr/local/bin/log-to-file.sh:ro,z
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # 4. Tesseract HTTP server - OCR; логи в /logs (в образе точка входа — /app/server.py)
+  tesseract:
+    build:
+      context: ../builders/stack4-tesseract
+      dockerfile: Dockerfile
+    image: stack4-tesseract:latest
+    container_name: stack4-tesseract
+    user: "${STACK4_USER:?STACK4_USER not set}"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: Asia/Vladivostok
+    networks: [ew_net_7198]
+    ports:
+      - "127.0.0.1:${STACK4_TESSERACT_HOST_PORT:?STACK4_TESSERACT_HOST_PORT not set}:8884"
+    entrypoint: ["/usr/local/bin/log-to-file.sh"]
+    command: ["/logs/tesseract.log", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8884"]
+    volumes:
+      - ../logs/stack4/tesseract:/logs:z
+      - ../scripts/log-to-file.sh:/usr/local/bin/log-to-file.sh:ro,z
+    working_dir: /app
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8884/', timeout=5)\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # 5. Paperless-ngx - DMS для Elite Editor
+  # Без user: — образ с s6-overlay требует /run owned by process user; при user=1000 падает с "fatal: /run belongs to uid 0"
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
+    container_name: stack4-paperless
+    security_opt:
+      - no-new-privileges:true
+    networks: [ew_net_7198, ew_net_2847]
+    ports:
+      - "127.0.0.1:${STACK4_PAPERLESS_HOST_PORT:?STACK4_PAPERLESS_HOST_PORT not set}:8000"
+    environment:
+      - TZ=Asia/Vladivostok
+      # Логи в файл на хосте (docker/logs/stack4/paperless)
+      - PAPERLESS_LOGGING_DIR=/logs
+      # Redis и Postgres из stack1; секреты и хосты — из env (docker/env_file/.env.stack4).
+      - PAPERLESS_REDIS=${PAPERLESS_REDIS:?PAPERLESS_REDIS required}
+      - PAPERLESS_DBHOST=${PAPERLESS_DBHOST:?PAPERLESS_DBHOST not set}
+      - PAPERLESS_DBNAME=${PAPERLESS_DBNAME:?PAPERLESS_DBNAME not set}
+      - PAPERLESS_DBUSER=${PAPERLESS_DBUSER:?PAPERLESS_DBUSER not set}
+      - PAPERLESS_DBPASS=${PAPERLESS_DBPASS:?PAPERLESS_DBPASS required}
+      - PAPERLESS_TIME_ZONE=${PAPERLESS_TIME_ZONE:?PAPERLESS_TIME_ZONE not set}
+      - PAPERLESS_SECRET_KEY=${PAPERLESS_SECRET_KEY:?PAPERLESS_SECRET_KEY required}
+    volumes:
+      # Данные в docker/data/stack4/paperless (создать каталоги и права см. в re_doc/SUDO-COMMANDS.md)
+      - ../data/stack4/paperless/data:/usr/src/paperless/data:z
+      - ../data/stack4/paperless/media:/usr/src/paperless/media:z
+      - ../data/stack4/paperless/export:/usr/src/paperless/export:z
+      - ../logs/stack4/paperless:/logs:z
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s

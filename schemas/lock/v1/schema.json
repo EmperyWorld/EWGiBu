@@ -1,0 +1,99 @@
+{
+  "$id": "iacpack.schemas.lock.v1",
+  "title": "iacpack.lock.json v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "manifest",
+    "schema",
+    "provider",
+    "compiler",
+    "mode",
+    "policy",
+    "buildParameters",
+    "inputs",
+    "images"
+  ],
+  "properties": {
+    "formatVersion": { "type": "string", "const": "iacpack.lock/v1" },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "semanticHash"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "semanticHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sha256"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "version"],
+      "properties": {
+        "profile": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "compiler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["product", "version"],
+      "properties": {
+        "product": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "mode": { "type": "string", "enum": ["development", "release"] },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256"],
+      "properties": {
+        "name": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "buildParameters": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "size", "mode", "sha256", "source"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "size": { "type": "integer", "minimum": 0 },
+          "mode": { "type": "string", "pattern": "^0[0-7]{3}$" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "source": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref"],
+        "properties": {
+          "ref": { "type": "string", "minLength": 1 },
+          "digest": { "type": "string" },
+          "build": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+services:
+  web:
+    image: docker.io/library/busybox:1.36
+    ports:
+      - "127.0.0.1:${WEB_HOST_PORT:?WEB_HOST_PORT not set}:8080"
+    volumes:
+      - ../data/logs:/logs:z

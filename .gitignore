@@ -1,0 +1,50 @@
+# Built binaries and local output (repository is source-only)
+/bin/
+/dist/
+/tmp/
+/testdata/perf/gen/
+/iacpack
+/iacpack.exe
+*.exe
+*.test
+*.out
+*.iacbundle
+
+# Go / tooling caches
+/.gocache/
+/.gomodcache/
+/.cache/
+/vendor/
+
+# Dependency and editor noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets and local env (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+credentials.json
+
+# Node / UI (future)
+node_modules/
+web/dist/
+web/coverage/
+web/.e2e-workspace
+web/test-results/
+web/playwright-report/
+pnpm-lock.yaml.future-placeholder
+
+# Coverage and fuzz artifacts
+*.coverprofile
+coverage.out
+**/testdata/fuzz/
+coverage.out
+coverage.html
+**/testdata/**/out/

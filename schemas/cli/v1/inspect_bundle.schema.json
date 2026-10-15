@@ -1,0 +1,59 @@
+{
+  "$id": "iacpack.schemas.cli.v1.inspect_bundle",
+  "title": "iacpack inspect bundle command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "inspect bundle"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "formatVersion", "project", "compiler", "provider", "runtime", "entries", "hasPreview"],
+          "properties": {
+            "path": { "type": "string" },
+            "formatVersion": { "type": "string" },
+            "project": { "type": "object" },
+            "compiler": { "type": "object" },
+            "provider": { "type": "object" },
+            "runtime": { "type": "object" },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "size", "mode", "sha256"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "size": { "type": "integer", "minimum": 0 },
+                  "mode": { "type": "string" },
+                  "sha256": { "type": "string" }
+                }
+              }
+            },
+            "hasPreview": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "iacpack.schemas.cli.v1.diagnostics"
+      }
+    }
+  }
+}

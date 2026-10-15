@@ -1,0 +1,43 @@
+{
+  "$id": "iacpack.schemas.cli.v1.import_prepare",
+  "title": "iacpack import prepare command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "iacpack.cli/v1"
+    },
+    "command": {
+      "type": "string",
+      "const": "import prepare"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["draftPath", "stubs"],
+      "properties": {
+        "draftPath": { "type": "string" },
+        "stubs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["createdDirs", "createdFiles", "createdBuildContexts", "skipped"],
+          "properties": {
+            "createdDirs": { "type": "array", "items": { "type": "string" } },
+            "createdFiles": { "type": "array", "items": { "type": "string" } },
+            "createdBuildContexts": { "type": "array", "items": { "type": "string" } },
+            "skipped": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "iacpack.schemas.cli.v1.diagnostics" }
+    }
+  }
+}

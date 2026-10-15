@@ -1,0 +1,95 @@
+name: stack0-frontend
+# =============================================================================
+# EliteEW · stack 0 — фронт (Nginx, статика, CSP)
+# =============================================================================
+# Запуск (из корня репо; env — как правило тот же, что у бэка, для CSP_*):
+#   docker compose -f docker/stack/stack0_f.yml --env-file docker/env_file/.env.stack0.backend up -d
+#
+# CSP (CSP_CONNECT_EXTRA, CSP_FRAME_EXTRA, …) — только сервис eliteew-frontend-prod
+# (entrypoint docker-entrypoint-csp.sh). stack0_b / API их не читает.
+#
+# Порт: по умолчанию **127.0.0.1:29001** через **`FRONTEND_HTTP_BIND`** в том же env, что и бэкенд (`docker/env_file/.env.stack0.backend`). LAN-тест: `FRONTEND_HTTP_BIND=0.0.0.0`.
+# Публичные origin: `ELITEEW_APP_ORIGIN` / `ELITEEW_AUTH_ORIGIN`. Пусто → `http://127.0.0.1:18080` и `:18088`. Облачный пример env задаёт `app.eliteew.ru` / `auth.eliteew.ru`.
+# (outDir dist-build — его монтирует контейнер; не путать с dist).
+#
+# Загрузки (image-studio, unified content, аудио): client_max_body_size 100M в nginx.prod.conf;
+# на хостовом nginx см. docker/host_conf/nginx-app-https.conf — иначе 413.
+#
+# Access: шаблон nginx.prod.conf → `/srv/...`; entrypoint копирует в `/var/lib/nginx/runtime/` + CSI → `/logs/access-docker.log`, tail в stderr.
+#
+# «Нет связи с сервером» в чате: проверить volume = dist-build; docker restart stack0-eliteew-frontend-prod;
+# curl -s -o /dev/null -w "%{http_code}" http://stack0-eliteew-api-prod:8000/health; Ctrl+Shift+R после деплоя.
+# =============================================================================
+
+networks:
+  ew_net_6211:
+    external: true
+  ew_net_9O11:
+    external: true
+
+services:
+  # ============================================================================
+  # EliteEW Frontend - Nginx
+  # ============================================================================
+  eliteew-frontend-prod:
+    image: eliteew-frontend-fedora:latest
+    container_name: stack0-eliteew-frontend-prod
+    # Podman rootless: nginx внутри образа слушает :80, для стабильного старта нужен root user.
+    # При необходимости можно явно переопределить обратно через STACK0_FRONTEND_USER.
+    user: "${STACK0_FRONTEND_USER:-0:0}"
+    networks:
+      - ew_net_6211
+      - ew_net_9O11
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    environment:
+      TZ: Asia/Vladivostok
+      CSP_CONNECT_EXTRA: ${CSP_CONNECT_EXTRA:-}
+      CSP_FRAME_EXTRA: ${CSP_FRAME_EXTRA:-}
+      # img-src: по умолчанию в entrypoint только self+data+blob; https: и Comfy LAN — задайте в env (см. FRONTEND-SECURITY-NGINX-STATIC.md).
+      CSP_IMG_EXTRA: ${CSP_IMG_EXTRA:-}
+      CSP_MEDIA_EXTRA: ${CSP_MEDIA_EXTRA:-}
+      # Public names for runtime-config.js and /auth-proxy. Unset → loopback.
+      # Cloud env file sets https://app.eliteew.ru and https://auth.eliteew.ru.
+      ELITEEW_APP_ORIGIN: ${ELITEEW_APP_ORIGIN:-http://127.0.0.1:18080}
+      ELITEEW_AUTH_ORIGIN: ${ELITEEW_AUTH_ORIGIN:-http://127.0.0.1:18088}
+      ELITEEW_AUTH_UPSTREAM: ${ELITEEW_AUTH_UPSTREAM:-stack6-keycloak}
+      ELITEEW_TLS_CERT: ${ELITEEW_TLS_CERT:-}
+      ELITEEW_TLS_KEY: ${ELITEEW_TLS_KEY:-}
+      # ANSI access в stderr (`docker logs`). Отключить: `ELITEEW_FRONTEND_TAIL_ACCESS_TO_STDERR=0`
+      ELITEEW_FRONTEND_TAIL_ACCESS_TO_STDERR: ${ELITEEW_FRONTEND_TAIL_ACCESS_TO_STDERR:-1}
+    ports:
+      # Прод: только localhost (внешний вход — reverse SSH на VM → 127.0.0.1:29001).
+      # Podman rootless cutover на 80: задайте FRONTEND_HTTP_PORT=80 (host sysctl net.ipv4.ip_unprivileged_port_start <= 80).
+      - "${FRONTEND_HTTP_BIND:-127.0.0.1}:${FRONTEND_HTTP_PORT:-29001}:8080"
+    volumes:
+      # Собранное приложение (pnpm build → dist-build по умолчанию)
+      - ../../shared/web/frontend/dist-build:/usr/share/nginx/html:ro,z
+      # Шаблон nginx prod: монтируем ro на /srv, entrypoint пишет /var/lib/nginx/runtime/default.conf (ANSI CSI для [FEC]-лога)
+      - ../../shared/web/frontend/nginx.prod.conf:/srv/eliteew/nginx.prod.template.conf:ro,z
+      # Сниппеты security-заголовков (include в nginx.prod.conf; без этого nginx -t падает)
+      - ../../shared/web/frontend/nginx/snippets:/etc/nginx/snippets:ro,z
+      # CSP + хвост access-docker → stderr без пересборки образа фронта
+      - ../../docker/builders/stack0-frontend/docker-entrypoint-csp.sh:/docker-entrypoint-csp.sh:ro,z
+      - ../logs/stack0/eliteew-frontend-prod:/logs:z
+      # Desktop-client private OTA (O2); empty dir OK until publish script stages files
+      - ../../docker/data/desktop-client-updates:/srv/eliteew/desktop-client-updates:ro,z
+      # FoFline OTA channel (W4); empty dir OK until fofline-publish-update.sh stages files
+      - ../../docker/data/fofline-updates:/srv/eliteew/fofline-updates:ro,z
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/sbin/curl -sf http://127.0.0.1:8080/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "stack=0"
+      - "service=frontend"
+      - "environment=production"

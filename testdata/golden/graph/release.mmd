@@ -1,0 +1,35 @@
+flowchart TD
+  naction_finalize["finalize"]
+  naction_image_app["image app"]
+  naction_image_postgres["image postgres"]
+  naction_network_backend["network backend"]
+  naction_resource_app_config["resource app-config"]
+  naction_service_app_ready["ready app"]
+  naction_service_app_start["start app"]
+  naction_service_db_ready["ready db"]
+  naction_service_db_start["start db"]
+  naction_task_migrate["task migrate"]
+  naction_verify["verify"]
+  naction_volume_db_data["volume db-data"]
+  naction_image_app --> naction_service_app_start
+  naction_image_app --> naction_task_migrate
+  naction_image_postgres --> naction_service_db_start
+  naction_network_backend --> naction_service_app_start
+  naction_network_backend --> naction_service_db_start
+  naction_resource_app_config --> naction_service_app_start
+  naction_service_app_ready --> naction_finalize
+  naction_service_app_start -->|started| naction_service_app_ready
+  naction_service_db_ready --> naction_finalize
+  naction_service_db_ready -->|healthy| naction_service_app_start
+  naction_service_db_ready -->|healthy| naction_task_migrate
+  naction_service_db_start -->|started| naction_service_db_ready
+  naction_task_migrate --> naction_finalize
+  naction_verify --> naction_image_app
+  naction_verify --> naction_image_postgres
+  naction_verify --> naction_network_backend
+  naction_verify --> naction_resource_app_config
+  naction_verify --> naction_service_app_start
+  naction_verify --> naction_service_db_start
+  naction_verify --> naction_task_migrate
+  naction_verify --> naction_volume_db_data
+  naction_volume_db_data --> naction_service_db_start

@@ -1,0 +1,427 @@
+# =============================================================================
+# EliteEW · stack1 — инфраструктура данных (Postgres, Redis, векторные БД, SeaweedFS, ES, RabbitMQ)
+# =============================================================================
+# Запуск из корня репо:
+#   docker compose -f docker/stack/stack1.yml --env-file docker/env_file/.env.stack1 up -d
+#
+# Пути относительно docker/stack/: ../data/stack1, ../logs/stack1. Права на хосте см. DOCKER-PERMISSIONS-FINAL.md
+# (postgres/redis/rabbitmq — 999:999; chroma/qdrant/seaweedfs/elasticsearch — 1000:1000).
+# SELinux MCS: security_opt `label=level:s0` на сервисах; см. DOCKER-SELINUX-BIND-MOUNTS.md
+#
+# Миграции приложения (БД ai_services) не выполняются при `up`; см. EliteEW/migrations/run_migration.py.
+# БД airflow/etherpad при необходимости: ./docker/scripts/stack1-create-missing-dbs.sh после первого подъёма.
+#
+# LAN workers (.141): задайте STACK1_CLIENT_BIND=192.168.1.136 в .env.stack1 (см. .env.stack1.lan-bind.example)
+# и firewalld: docker/scripts/lan-workers/setup-punisher-firewalld-lan141.sh
+# =============================================================================
+name: stack1
+
+networks:
+  ew_net_2847:
+    external: true
+
+services:
+  # 1. PostgreSQL - главная БД с увеличенным лимитом подключений
+  postgres:
+    image: docker.io/library/postgres:18.4
+    container_name: stack1-postgres
+    networks: [ew_net_2847]
+    user: "${STACK1_UID_DB:?STACK1_UID_DB not set}"
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    # log_file_mode=0644 — новые *.log/*.csv на томе читает stack3-vector (иначе Permission denied).
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - log_destination=csvlog
+      - -c
+      - logging_collector=on
+      - -c
+      - log_directory=/logs
+      - -c
+      - log_file_mode=0644
+      # Переопределяют timezone/log_timezone из postgresql.conf (часто Etc/UTC на томе без прав на правку).
+      - -c
+      - timezone=Asia/Vladivostok
+      - -c
+      - log_timezone=Asia/Vladivostok
+      # Reduce checkpoint pressure after PG18 cutover: fewer requested checkpoints, smoother WAL I/O.
+      - -c
+      - checkpoint_timeout=10min
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - max_wal_size=8GB
+    environment:
+      TZ: Asia/Vladivostok
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ../data/stack1/postgresql:/var/lib/postgresql/data:z
+      - ../data/stack1/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf:ro,z
+      - ../logs/stack1/postgres:/logs:z
+    ports:
+      - "${STACK1_CLIENT_BIND:-127.0.0.1}:${POSTGRES_HOST_PORT:?POSTGRES_HOST_PORT not set}:5432"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "250m"
+        max-file: "5"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'      # max_connections ~300, Paperless, stack0 pools (see STACK1-POSTGRES-TUNING.md)
+          memory: 24G      # ULTRATHINK: shared_buffers 25% RAM + connections + work_mem
+        reservations:
+          memory: 16G       # Minimum for stable operations
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # 2. Redis - кеш и очереди (фикс: redis:7.2 — latest 8.x даёт краши в модулях)
+  redis:
+    image: docker.io/library/redis:7.2.14-alpine
+    container_name: stack1-redis
+    user: "${STACK1_UID_DB:?STACK1_UID_DB not set}"
+    networks: [ew_net_2847]
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    environment:
+      TZ: Asia/Vladivostok
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      # Reduce overlap between frequent RDB forks and AOF fsync spikes while keeping durable snapshots.
+      - --save
+      - "900 1"
+      - --save
+      - "300 10000"
+      - --maxmemory
+      - "8gb"
+      - --maxmemory-policy
+      - "allkeys-lru"
+      - --latency-monitor-threshold
+      - "100"
+      - --protected-mode
+      - "no"
+      - --requirepass
+      - "${REDIS_PASSWORD}"
+      - --rename-command
+      - "CONFIG"
+      - "CONFIG_b8f3d2a9e4c1"
+      - --rename-command
+      - "SHUTDOWN"
+      - "SHUTDOWN_a7e2c9b4f1d3"
+      - --rename-command
+      - "DEBUG"
+      - "DEBUG_c4e1a9f2d7b3"
+      - --rename-command
+      - "MODULE"
+      - "MODULE_e8b2d5a1c9f4"
+      - --rename-command
+      - "REPLICAOF"
+      - "REPLICAOF_f3a6c8e2b1d9"
+      - --dir
+      - "/data"
+      # Логи в stdout (json-file драйвер Docker); файл на томе /logs давал Permission denied для user STACK1_UID_DB.
+      - --logfile
+      - ""
+    volumes:
+      - ../data/stack1/redis:/data:z
+    ports:
+      - "${STACK1_CLIENT_BIND:-127.0.0.1}:${REDIS_HOST_PORT:?REDIS_HOST_PORT not set}:6379"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "250m"
+        max-file: "5"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 10G
+        reservations:
+          memory: 8G
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # 3. ChromaDB - векторная БД (образ по умолчанию от root; volume на хосте — свой каталог)
+  chroma:
+    image: docker.io/chromadb/chroma:1.5.9
+    container_name: stack1-chroma
+    user: "${STACK1_UID_APP:?STACK1_UID_APP not set}"
+    networks: [ew_net_2847]
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    # Chroma 1.5+ запускается через CLI subcommand `run`.
+    command:
+      [
+        "run",
+        "--path",
+        "/chroma/data",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+      ]
+    environment:
+      TZ: Asia/Vladivostok
+      IS_PERSISTENT: "TRUE"
+      CHROMA_DB_PATH: /chroma/data
+      PERSIST_DIRECTORY: /chroma/data
+      CHROMA_SERVER_HOST: "0.0.0.0"
+      CHROMA_SERVER_HTTP_PORT: 8000
+    volumes:
+      - ../data/stack1/chroma:/chroma/data:z
+      - ../logs/stack1/chroma:/logs:z
+      - ../data/stack1/uvicorn-log-config.yaml:/etc/uvicorn-log-config.yaml:ro,z
+    ports:
+      - "${STACK1_CLIENT_BIND:-127.0.0.1}:${CHROMA_HOST_PORT:?CHROMA_HOST_PORT not set}:8000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "250m"
+        max-file: "5"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'      # ULTRATHINK: Vector embeddings compute + indexing
+          memory: 8G       # ULTRATHINK: Current 11MB, growth potential for large collections
+        reservations:
+          memory: 4G       # Stable baseline for vector operations
+
+  # RETIRED 2026-08-09: stack1-chroma-code (orphan code-search Chroma).
+  # Living code/docs index = KBSEW → Qdrant (barrels eliteew-docs / eliteew-api / eliteew-frontend).
+  # Data dir retained on disk: docker/data/stack1/chroma-code (not deleted).
+  # Do not recreate this service without an explicit operator restore task.
+
+  # 4. Qdrant - векторная БД
+  qdrant:
+    image: ${QDRANT_IMAGE:-docker.io/qdrant/qdrant:v1.18.2-unprivileged}
+    container_name: stack1-qdrant
+    user: "${STACK1_UID_APP:?STACK1_UID_APP not set}"
+    networks: [ew_net_2847]
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    environment:
+      TZ: Asia/Vladivostok
+      # Логи в файл заданы в production.yaml. Env QDRANT__LOGGER__* в образе при старте не применяются.
+      QDRANT__LOG_LEVEL: info
+      # Prod-core has no outbound to telemetry.qdrant.io — disable to avoid ERROR spam.
+      QDRANT__TELEMETRY_DISABLED: "true"
+    volumes:
+      - ../data/stack1/qdrant:/qdrant/storage:z
+      - ../logs/stack1/qdrant:/logs:z
+      - ../data/stack1/qdrant-config/production.yaml:/qdrant/config/production.yaml:ro,z
+    ports:
+      - "${STACK1_CLIENT_BIND:-127.0.0.1}:${QDRANT_GRPC_HOST_PORT:?QDRANT_GRPC_HOST_PORT not set}:6333"
+      - "${STACK1_CLIENT_BIND:-127.0.0.1}:${QDRANT_HTTP_HOST_PORT:?QDRANT_HTTP_HOST_PORT not set}:6334"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "250m"
+        max-file: "5"
+    restart: unless-stopped
+    healthcheck:
+      # Образ без curl/wget: проверяем, что REST-порт 6333 принимает TCP (полный GET /readyz — снаружи через curl на host port).
+      test: ["CMD-SHELL", "timeout 5 bash -c 'echo > /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'      # ULTRATHINK: Vector search optimization
+          memory: 8G       # ULTRATHINK: Current 65MB, headroom for vector indexes
+        reservations:
+          memory: 4G       # Baseline for vector storage
+
+  # 5. SeaweedFS - S3 хранилище (замена MinIO); WEED_UID/GID 1000 — непривилегированный пользователь
+  # Все данные (master, volume chunks, filer) в /data — не очищать каталог docker/data/stack1/seaweedfs/data на хосте.
+  # defaultReplication=000: одна копия чанка на одном volume — при потере .dat / сбое диска возможны «сироты» в filer.
+  # Страховка: бэкап каталога seaweedfs/data, POST /api/v1/content/admin/scan-missing-blobs, после загрузки API делает stat verify.
+  # Ключи: те же MINIO_* что в .env.stack1 (см. docker/env_file/SYNC_STACK0_STACK1.md). На 3.64 weed может не читать env для S3;
+  # на новых версиях и при IAM на шлюзе совпадение с API критично. Пустые ключи = только для dev без секретов в .env.stack1.
+  seaweedfs:
+    image: docker.io/chrislusf/seaweedfs:4.34
+    container_name: stack1-seaweedfs
+    user: "${STACK1_UID_APP:?STACK1_UID_APP not set}"
+    networks: [ew_net_2847]
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    command:
+      - -logdir=/logs
+      - server
+      - -s3
+      - -filer
+      - -dir=/data
+      - -master.port=9333
+      - -volume.port=8080
+      - -volume.max=64
+      - -volume.preStopSeconds=3
+      - -filer.port=8888
+      - -s3.port=8333
+      - -master.defaultReplication=000
+    environment:
+      - TZ=Asia/Vladivostok
+      - WEED_UID=1000
+      - WEED_GID=1000
+      # Совместимость с клиентами (stack0): имена AWS_* ожидает часть версий SeaweedFS S3 (см. wiki S3 Credentials).
+      - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY:-}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_KEY:-}
+    volumes:
+      - ../data/stack1/seaweedfs/data:/data:z
+      - ../logs/stack1/seaweedfs:/logs:z
+    ports:
+      - "${STACK1_CLIENT_BIND:-127.0.0.1}:${SEAWEEDFS_MASTER_PORT:?SEAWEEDFS_MASTER_PORT not set}:9333"
+      - "${STACK1_CLIENT_BIND:-127.0.0.1}:${SEAWEEDFS_FILER_PORT:?SEAWEEDFS_FILER_PORT not set}:8888"
+      - "${STACK1_CLIENT_BIND:-127.0.0.1}:${SEAWEEDFS_S3_PORT:?SEAWEEDFS_S3_PORT not set}:8333"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "250m"
+        max-file: "5"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9333 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          memory: 2G
+  # 6. Elasticsearch - поисковая БД (образ от uid 1000; ulimits memlock нужен для mlockall)
+  elasticsearch:
+    image: docker.io/library/elasticsearch:9.4.2
+    container_name: stack1-elasticsearch
+    # Elasticsearch не стартует под root; отдельный uid нужен для Podman cutover.
+    user: "${STACK1_UID_SEARCH:-1000:1000}"
+    networks: [ew_net_2847]
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    environment:
+      TZ: Asia/Vladivostok
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+
+      # ✅ Исправление locale WARN
+      ES_JAVA_OPTS: "-Xms2g -Xmx2g -Djava.locale.providers=CLDR,COMPAT,SPI"
+
+      network.host: "0.0.0.0"
+      http.host: "0.0.0.0"
+
+      # ✅ Логи в файл в /logs (docker/logs/stack1/elasticsearch). file = log4j file appender.
+      ES_LOG_STYLE: file
+      # ✅ Нормальное логирование (WARN логи будут исправлены)
+      logger.level: "INFO"
+
+    volumes:
+      - ../data/stack1/elasticsearch:/usr/share/elasticsearch/data:z
+      - ../data/stack1/elasticsearch_config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro,z
+      # aws_config/aws_credentials: при необходимости snapshot S3 — смонтировать файлы (не каталоги), см. docker-re_doc.
+      - ../logs/stack1/elasticsearch:/logs:z
+
+    ports:
+      - "${STACK1_CLIENT_BIND:-127.0.0.1}:${ELASTICSEARCH_HOST_PORT:?ELASTICSEARCH_HOST_PORT not set}:9200"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "250m"
+        max-file: "5"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 8G
+        reservations:
+          memory: 4G
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # 7. RabbitMQ - очереди сообщений (user 999:999 — владелец volume, без привилегий)
+  rabbitmq:
+    image: docker.io/library/rabbitmq:4.3.2-management
+    container_name: stack1-rabbitmq
+    user: "${STACK1_UID_DB:?STACK1_UID_DB not set}"
+    networks: [ew_net_2847]
+    security_opt:
+      - no-new-privileges:true
+      - label=level:s0
+    environment:
+      TZ: Asia/Vladivostok
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_NODE_IP_ADDRESS: "0.0.0.0"
+      # Логи в файл (docker/logs/stack1/rabbitmq) для Vector. При RABBITMQ_LOGS конфиг conf.d по логам не применяется.
+      RABBITMQ_LOGS: /logs/rabbitmq.log
+      # Connection settings for better reliability
+      RABBITMQ_HEARTBEAT: 60
+      RABBITMQ_HANDSHAKE_TIMEOUT: 10000
+    volumes:
+      - ../data/stack1/rabbitmq:/var/lib/rabbitmq:z
+      - ../data/stack1/rabbitmq-conf:/etc/rabbitmq/conf.d:ro,z
+      - ../logs/stack1/rabbitmq:/logs:z
+    ports:
+      - "${STACK1_CLIENT_BIND:-127.0.0.1}:${RABBITMQ_AMQP_PORT:?RABBITMQ_AMQP_PORT not set}:5672"
+      - "${STACK1_CLIENT_BIND:-127.0.0.1}:${RABBITMQ_MGMT_PORT:?RABBITMQ_MGMT_PORT not set}:15672"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "250m"
+        max-file: "5"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          memory: 1G

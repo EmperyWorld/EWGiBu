@@ -1,0 +1,58 @@
+{
+  "$id": "iacpack.schemas.deployment.v1",
+  "title": "iacpack compiled deployment document v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "project",
+    "mode",
+    "profile",
+    "semanticHash",
+    "parameters",
+    "secrets",
+    "images",
+    "resources",
+    "networks",
+    "volumes",
+    "services",
+    "tasks",
+    "package"
+  ],
+  "properties": {
+    "formatVersion": { "type": "string", "const": "iacpack.deployment/v1" },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "mode": { "type": "string", "enum": ["development", "release"] },
+    "profile": { "type": "string" },
+    "semanticHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "parameters": { "type": "object" },
+    "secrets": { "type": "object" },
+    "images": { "type": "object" },
+    "resources": { "type": "object" },
+    "networks": { "type": "object" },
+    "volumes": { "type": "object" },
+    "services": { "type": "object" },
+    "tasks": { "type": "object" },
+    "builds": { "type": "object" },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generateReadme", "generateEnvExample", "includeRuntime", "embedImages"],
+      "properties": {
+        "generateReadme": { "type": "boolean" },
+        "generateEnvExample": { "type": "boolean" },
+        "includeRuntime": { "type": "boolean" },
+        "embedImages": { "type": "boolean" }
+      }
+    }
+  }
+}

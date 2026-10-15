@@ -1,0 +1,32 @@
+{
+  "$id": "iacpack.schemas.cli.v1.doctor",
+  "title": "iacpack doctor command JSON result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "ok", "result", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "iacpack.cli/v1" },
+    "command": { "type": "string", "const": "doctor" },
+    "ok": { "type": "boolean" },
+    "result": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["checks", "mutations"],
+          "properties": {
+            "checks": { "type": "array" },
+            "dockerSocket": { "type": "string" },
+            "dockerConfig": { "type": "string" },
+            "mutations": { "type": "integer", "const": 0 }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "iacpack.schemas.cli.v1.diagnostics" }
+    }
+  }
+}

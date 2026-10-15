@@ -1,0 +1,2903 @@
+apiVersion: iacpack.io/v1alpha1
+kind: Project
+metadata:
+  name: stack6
+  version: 0.1.0
+spec:
+  images:
+    chroma:
+      delivery: pull
+      ref: docker.io/chromadb/chroma:1.5.9
+    elasticsearch:
+      delivery: pull
+      ref: docker.io/library/elasticsearch:9.4.2
+    eliteew-api-prod:
+      delivery: pull
+      ref:
+        parameter: stack0-api-image
+    eliteew-celery-beat-prod:
+      delivery: pull
+      ref: docker.io/library/eliteew-celery-beat:v3
+    eliteew-frontend-prod:
+      delivery: pull
+      ref: eliteew-frontend-fedora:latest
+    gotenberg:
+      delivery: pull
+      ref: gotenberg/gotenberg:8.33.0
+    keycloak:
+      delivery: pull
+      ref: quay.io/keycloak/keycloak:26.7.1
+    keycloak-postgres:
+      delivery: pull
+      ref: docker.io/library/postgres:18.4-alpine
+    ocrmypdf-api:
+      delivery: pull
+      ref: stack4-ocrmypdf-api:latest
+    paperless:
+      delivery: pull
+      ref: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
+    postgres:
+      delivery: pull
+      ref: docker.io/library/postgres:18.4
+    qdrant:
+      delivery: pull
+      ref: docker.io/qdrant/qdrant:v1.18.2-unprivileged
+    rabbitmq:
+      delivery: pull
+      ref: docker.io/library/rabbitmq:4.3.2-management
+    redis:
+      delivery: pull
+      ref: docker.io/library/redis:7.2.14-alpine
+    seaweedfs:
+      delivery: pull
+      ref: docker.io/chrislusf/seaweedfs:4.34
+    stack-ewa-postgres:
+      delivery: pull
+      ref: docker.io/library/postgres:18.4
+    tesseract:
+      delivery: pull
+      ref: stack4-tesseract:latest
+    tika:
+      delivery: pull
+      ref: apache/tika:3.3.1.0
+  mode: development
+  networks:
+    ew-net-2847:
+      external:
+        name: ew_net_2847
+    ew-net-3365:
+      external:
+        name: ew_net_3365
+    ew-net-4532:
+      external:
+        name: ew_net_4532
+    ew-net-5402:
+      external:
+        name: ew_net_5402
+    ew-net-6211:
+      external:
+        name: ew_net_6211
+    ew-net-7198:
+      external:
+        name: ew_net_7198
+    ew-net-9o11:
+      external:
+        name: ew_net_9O11
+  parameters:
+    admin-panel-enabled:
+      phase: deploy
+      type: string
+    ai-embeddings-dimension:
+      default: "768"
+      phase: deploy
+      type: string
+    ai-embeddings-fallback-model:
+      phase: deploy
+      type: string
+    airflow-url:
+      phase: deploy
+      type: string
+    airflow-username:
+      phase: deploy
+      type: string
+    anonymized-telemetry:
+      phase: deploy
+      type: string
+    api-host:
+      phase: deploy
+      type: string
+    api-host-port:
+      phase: deploy
+      type: integer
+    api-port:
+      phase: deploy
+      type: string
+    api-workers:
+      phase: deploy
+      type: string
+    asyncpg-pool-max-size:
+      default: "5"
+      phase: deploy
+      type: string
+    asyncpg-pool-min-size:
+      default: "1"
+      phase: deploy
+      type: string
+    auth-provider-backend:
+      default: keycloak
+      phase: deploy
+      type: string
+    auth-provider-shadow-backend:
+      phase: deploy
+      type: string
+    auth-provider-shadow-enabled:
+      default: "false"
+      phase: deploy
+      type: string
+    auth-role-client-ids:
+      phase: deploy
+      type: string
+    aws-region:
+      phase: deploy
+      type: string
+    aws-s3-endpoint:
+      phase: deploy
+      type: string
+    browser-render-service-url:
+      default: http://stack0-eliteew-api-worker-prod:8095
+      phase: deploy
+      type: string
+    celery-redis-db:
+      phase: deploy
+      type: string
+    chroma-host-port:
+      phase: deploy
+      type: integer
+    chromadb-container-name:
+      default: stack1-chroma
+      phase: deploy
+      type: string
+    chromadb-external-host:
+      default: 127.0.0.1
+      phase: deploy
+      type: string
+    chromadb-external-port:
+      default: "30002"
+      phase: deploy
+      type: string
+    chromadb-host:
+      default: stack1-chroma
+      phase: deploy
+      type: string
+    chromadb-port:
+      default: "8000"
+      phase: deploy
+      type: string
+    comfyui-debug-save-prompt-dir:
+      phase: deploy
+      type: string
+    comfyui-url:
+      phase: deploy
+      type: string
+    cors-allowed-origins:
+      phase: deploy
+      type: string
+    csp-connect-extra:
+      phase: deploy
+      type: string
+    csp-frame-extra:
+      phase: deploy
+      type: string
+    csp-img-extra:
+      phase: deploy
+      type: string
+    csp-media-extra:
+      phase: deploy
+      type: string
+    cuda-home:
+      phase: deploy
+      type: string
+    database-url:
+      phase: deploy
+      type: string
+    debug:
+      phase: deploy
+      type: string
+    debug-mode:
+      phase: deploy
+      type: string
+    docker-network:
+      phase: deploy
+      type: string
+    elastic-max-retries:
+      phase: deploy
+      type: string
+    elasticsearch-connect-timeout:
+      default: "15"
+      phase: deploy
+      type: string
+    elasticsearch-dead-node-backoff-factor:
+      default: "2"
+      phase: deploy
+      type: string
+    elasticsearch-host:
+      phase: deploy
+      type: string
+    elasticsearch-host-port:
+      phase: deploy
+      type: integer
+    elasticsearch-max-dead-node-backoff:
+      default: "30"
+      phase: deploy
+      type: string
+    elasticsearch-max-retries:
+      default: "2"
+      phase: deploy
+      type: string
+    elasticsearch-port:
+      phase: deploy
+      type: string
+    elasticsearch-request-timeout:
+      default: "60"
+      phase: deploy
+      type: string
+    elasticsearch-retry-on-timeout:
+      default: "true"
+      phase: deploy
+      type: string
+    elasticsearch-scheme:
+      phase: deploy
+      type: string
+    elasticsearch-soft-reconnect-interval-sec:
+      default: "60"
+      phase: deploy
+      type: string
+    elasticsearch-user:
+      phase: deploy
+      type: string
+    eliteew-app-origin:
+      default: http://127.0.0.1:18080
+      phase: deploy
+      type: string
+    eliteew-auth-origin:
+      default: http://127.0.0.1:18088
+      phase: deploy
+      type: string
+    eliteew-auth-upstream:
+      default: stack6-keycloak
+      phase: deploy
+      type: string
+    eliteew-bez-diagnostic-logs:
+      default: "true"
+      phase: deploy
+      type: string
+    eliteew-bez-planner-llm-timeout-initial-sec:
+      default: "120"
+      phase: deploy
+      type: string
+    eliteew-bez-planner-llm-timeout-replanner-sec:
+      default: "90"
+      phase: deploy
+      type: string
+    eliteew-bez-planner-mode:
+      default: json
+      phase: deploy
+      type: string
+    eliteew-bez-planner-model:
+      phase: deploy
+      type: string
+    eliteew-binding-api-base-url:
+      default: https://app.eliteew.ru/api/v1/desktop-client
+      phase: deploy
+      type: string
+    eliteew-frontend-tail-access-to-stderr:
+      default: "1"
+      phase: deploy
+      type: string
+    eliteew-log-level:
+      default: INFO
+      phase: deploy
+      type: string
+    eliteew-public-openapi-docs:
+      default: "false"
+      phase: deploy
+      type: string
+    eliteew-require-site-studio-worker-at-startup:
+      default: "true"
+      phase: deploy
+      type: string
+    eliteew-site-studio-allow-inline-fallback:
+      default: "false"
+      phase: deploy
+      type: string
+    eliteew-tls-cert:
+      phase: deploy
+      type: string
+    eliteew-tls-key:
+      phase: deploy
+      type: string
+    enable-queue-bi:
+      phase: deploy
+      type: string
+    enable-queue-docs:
+      phase: deploy
+      type: string
+    enable-queue-ewrp:
+      phase: deploy
+      type: string
+    enable-queue-notifications:
+      phase: deploy
+      type: string
+    enable-queue-site-studio:
+      default: "true"
+      phase: deploy
+      type: string
+    enable-queue-ugs:
+      phase: deploy
+      type: string
+    enable-queue-voice:
+      phase: deploy
+      type: string
+    enable-rabbitmq:
+      phase: deploy
+      type: string
+    encryption-enabled:
+      phase: deploy
+      type: string
+    encryption-master-key:
+      phase: deploy
+      type: string
+    ewa-pg-tz:
+      default: Asia/Vladivostok
+      phase: deploy
+      type: string
+    ewa-postgres-db:
+      phase: deploy
+      type: string
+    ewa-postgres-host-port:
+      phase: deploy
+      type: integer
+    ewa-postgres-user:
+      phase: deploy
+      type: string
+    ewrp-llama-outline-timeout-sec:
+      default: "240"
+      phase: deploy
+      type: string
+    ewrp-llama-slide-timeout-sec:
+      default: "300"
+      phase: deploy
+      type: string
+    external-domain:
+      phase: deploy
+      type: string
+    frontend-http-port:
+      phase: deploy
+      type: integer
+    generated-files-base:
+      phase: deploy
+      type: string
+    gotenberg-url:
+      default: http://stack4-gotenberg:3000
+      phase: deploy
+      type: string
+    host-ip:
+      phase: deploy
+      type: string
+    imc-rag-llama-generate-timeout-sec:
+      phase: deploy
+      type: string
+    imc-rag-llama-num-ctx:
+      phase: deploy
+      type: string
+    imc-rag-llama-repeat-last-n:
+      phase: deploy
+      type: string
+    imc-rag-llama-repeat-penalty:
+      phase: deploy
+      type: string
+    imc-rag-llama-top-p:
+      phase: deploy
+      type: string
+    imc-rag-max-prompt-chars:
+      phase: deploy
+      type: string
+    imc-rag-merge-max-prompt-chars:
+      phase: deploy
+      type: string
+    imc-rag-num-predict:
+      phase: deploy
+      type: string
+    jitsi-app-id:
+      phase: deploy
+      type: string
+    jitsi-public-url:
+      default: https://meet.eliteew.ru
+      phase: deploy
+      type: string
+    jitsi-token-ttl-seconds:
+      default: "3600"
+      phase: deploy
+      type: string
+    jitsi-xmpp-domain:
+      default: meet.eliteew.ru
+      phase: deploy
+      type: string
+    jwt-algorithm:
+      phase: deploy
+      type: string
+    jwt-expiration-minutes:
+      phase: deploy
+      type: string
+    kc-hostname:
+      phase: deploy
+      type: string
+    kc-hostname-admin:
+      phase: deploy
+      type: string
+    kc-proxy-trusted-addresses:
+      default: 127.0.0.0/8,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16
+      phase: deploy
+      type: string
+    keycloak-admin:
+      phase: deploy
+      type: string
+    keycloak-client-id:
+      phase: deploy
+      type: string
+    keycloak-host-port:
+      phase: deploy
+      type: integer
+    keycloak-mobile-client-id:
+      default: empery-mobile
+      phase: deploy
+      type: string
+    keycloak-postgres-host-port:
+      phase: deploy
+      type: integer
+    keycloak-public-url:
+      phase: deploy
+      type: string
+    keycloak-realm:
+      phase: deploy
+      type: string
+    keycloak-url:
+      phase: deploy
+      type: string
+    keycloak-verify-audience:
+      phase: deploy
+      type: string
+    keycloak-web-client-id:
+      default: empery-web
+      phase: deploy
+      type: string
+    llama-embed-timeout-sec:
+      default: "180"
+      phase: deploy
+      type: string
+    llama-embedding-model:
+      phase: deploy
+      type: string
+    llama-model:
+      phase: deploy
+      type: string
+    llama-model-bi:
+      phase: deploy
+      type: string
+    llama-model-marketing:
+      phase: deploy
+      type: string
+    llama-model-music-text-gen:
+      phase: deploy
+      type: string
+    llama-url:
+      phase: deploy
+      type: string
+    llama-use-openai-api:
+      phase: deploy
+      type: string
+    log-format:
+      phase: deploy
+      type: string
+    log-level:
+      phase: deploy
+      type: string
+    marketing-cabinet-router-model:
+      phase: deploy
+      type: string
+    marketing-cache-db:
+      phase: deploy
+      type: string
+    marketing-celery-queue:
+      phase: deploy
+      type: string
+    minio-access-key:
+      phase: deploy
+      type: string
+    minio-console-port:
+      default: "30005"
+      phase: deploy
+      type: string
+    minio-external-port:
+      default: "30006"
+      phase: deploy
+      type: string
+    minio-host:
+      default: stack1-seaweedfs
+      phase: deploy
+      type: string
+    minio-port:
+      default: "8333"
+      phase: deploy
+      type: string
+    minio-secure:
+      phase: deploy
+      type: string
+    mkl-num-threads:
+      phase: deploy
+      type: string
+    monitoring-enabled:
+      phase: deploy
+      type: string
+    music-evolution-debug-json-dir:
+      default: /app/generated_files/music_evolution_debug_json
+      phase: deploy
+      type: string
+    music-generator-debug-json-dir:
+      phase: deploy
+      type: string
+    node-env:
+      phase: deploy
+      type: string
+    nvidia-driver-capabilities:
+      default: compute,utility
+      phase: deploy
+      type: string
+    nvidia-visible-devices:
+      default: all
+      phase: deploy
+      type: string
+    oidc-provider-client-id:
+      phase: deploy
+      type: string
+    oidc-provider-issuer-url:
+      phase: deploy
+      type: string
+    oidc-provider-verify-audience:
+      default: "true"
+      phase: deploy
+      type: string
+    oidc-provider-web-client-id:
+      phase: deploy
+      type: string
+    omp-num-threads:
+      phase: deploy
+      type: string
+    paperless-dbhost:
+      phase: deploy
+      type: string
+    paperless-dbname:
+      phase: deploy
+      type: string
+    paperless-dbpass:
+      phase: deploy
+      type: string
+    paperless-dbuser:
+      phase: deploy
+      type: string
+    paperless-redis:
+      phase: deploy
+      type: string
+    paperless-time-zone:
+      phase: deploy
+      type: string
+    playwright-browsers-path:
+      phase: deploy
+      type: string
+    postgres-db:
+      phase: deploy
+      type: string
+    postgres-host:
+      phase: deploy
+      type: string
+    postgres-host-port:
+      phase: deploy
+      type: integer
+    postgres-max-overflow:
+      default: "15"
+      phase: deploy
+      type: string
+    postgres-pool-recycle:
+      default: "3600"
+      phase: deploy
+      type: string
+    postgres-pool-size:
+      default: "10"
+      phase: deploy
+      type: string
+    postgres-pool-timeout:
+      default: "30"
+      phase: deploy
+      type: string
+    postgres-port:
+      phase: deploy
+      type: string
+    postgres-user:
+      phase: deploy
+      type: string
+    pythondontwritebytecode:
+      phase: deploy
+      type: string
+    pythonpycacheprefix:
+      phase: deploy
+      type: string
+    pytorch-alloc-conf:
+      phase: deploy
+      type: string
+    qdrant-container-name:
+      default: stack1-qdrant
+      phase: deploy
+      type: string
+    qdrant-external-host:
+      default: 127.0.0.1
+      phase: deploy
+      type: string
+    qdrant-external-port:
+      default: "30003"
+      phase: deploy
+      type: string
+    qdrant-grpc-host-port:
+      phase: deploy
+      type: integer
+    qdrant-grpc-port:
+      default: "6334"
+      phase: deploy
+      type: string
+    qdrant-host:
+      default: stack1-qdrant
+      phase: deploy
+      type: string
+    qdrant-http-host-port:
+      phase: deploy
+      type: integer
+    qdrant-port:
+      default: "6333"
+      phase: deploy
+      type: string
+    rabbitmq-amqp-port:
+      phase: deploy
+      type: integer
+    rabbitmq-blocked-connection-timeout:
+      default: "300"
+      phase: deploy
+      type: string
+    rabbitmq-container-name:
+      default: stack1-rabbitmq
+      phase: deploy
+      type: string
+    rabbitmq-external-host:
+      default: 127.0.0.1
+      phase: deploy
+      type: string
+    rabbitmq-external-port:
+      default: "30008"
+      phase: deploy
+      type: string
+    rabbitmq-heartbeat:
+      default: "60"
+      phase: deploy
+      type: string
+    rabbitmq-host:
+      default: stack1-rabbitmq
+      phase: deploy
+      type: string
+    rabbitmq-management-internal-port:
+      default: "15672"
+      phase: deploy
+      type: string
+    rabbitmq-management-port:
+      default: "30009"
+      phase: deploy
+      type: string
+    rabbitmq-mgmt-port:
+      phase: deploy
+      type: integer
+    rabbitmq-port:
+      default: "5672"
+      phase: deploy
+      type: string
+    rabbitmq-user:
+      phase: deploy
+      type: string
+    rabbitmq-vhost:
+      default: /
+      phase: deploy
+      type: string
+    rate-limit-enabled:
+      phase: deploy
+      type: string
+    rate-limit-per-minute:
+      phase: deploy
+      type: string
+    redis-host:
+      phase: deploy
+      type: string
+    redis-host-port:
+      phase: deploy
+      type: integer
+    redis-port:
+      phase: deploy
+      type: string
+    registration-enabled:
+      phase: deploy
+      type: string
+    registration-require-approval:
+      phase: deploy
+      type: string
+    s3-bucket:
+      phase: deploy
+      type: string
+    s3-bucket-default-encryption:
+      phase: deploy
+      type: string
+    s3-secure:
+      phase: deploy
+      type: string
+    s3-use-path-style:
+      phase: deploy
+      type: string
+    science-stack-service-url:
+      default: http://stack0-eliteew-api-worker-prod:8096
+      phase: deploy
+      type: string
+    seaweedfs-filer-port:
+      phase: deploy
+      type: integer
+    seaweedfs-master-port:
+      phase: deploy
+      type: integer
+    seaweedfs-s3-port:
+      phase: deploy
+      type: integer
+    silero-service-url:
+      default: http://stack9-silero:8000
+      phase: deploy
+      type: string
+    site-studio-olenti-api-image:
+      phase: deploy
+      type: string
+    site-studio-olenti-frontend-image:
+      phase: deploy
+      type: string
+    site-studio-worker-ready-window-seconds:
+      default: "180"
+      phase: deploy
+      type: string
+    stack0-api-image:
+      phase: deploy
+      type: string
+    stack0-cache-dir:
+      phase: deploy
+      type: string
+    stack0-doc-builder-rel:
+      phase: deploy
+      type: string
+    stack0-doc-docfile-rel:
+      phase: deploy
+      type: string
+    stack0-doc-env-file-hint:
+      phase: deploy
+      type: string
+    stack0-doc-llm-overview-rel:
+      phase: deploy
+      type: string
+    stack0-doc-redis-host-hint:
+      phase: deploy
+      type: string
+    stack0-doc-requirements-rel:
+      phase: deploy
+      type: string
+    stack0-doc-runtime-layer-hint:
+      phase: deploy
+      type: string
+    stack0-doc-stack1-hint:
+      phase: deploy
+      type: string
+    stack0-doc-stack4-hint:
+      phase: deploy
+      type: string
+    stack0-doc-voice-transcribe-endpoint:
+      phase: deploy
+      type: string
+    stack0-doc-whisper-backend-hint:
+      phase: deploy
+      type: string
+    stack0-enable-legacy-ml-cache-dirs:
+      default: "0"
+      phase: deploy
+      type: string
+    stack0-ffmpeg-bin:
+      phase: deploy
+      type: string
+    stack0-hf-home:
+      phase: deploy
+      type: string
+    stack0-ll-http-health-suffix:
+      phase: deploy
+      type: string
+    stack0-onnx-home:
+      phase: deploy
+      type: string
+    stack0-package-import-checklist:
+      phase: deploy
+      type: string
+    stack0-preflight-fail-on:
+      default: postgres,redis,ewa_postgres
+      phase: deploy
+      type: string
+    stack0-preflight-verbose:
+      default: "0"
+      phase: deploy
+      type: string
+    stack0-python-venv:
+      phase: deploy
+      type: string
+    stack0-redis-flushall-on-start:
+      default: "0"
+      phase: deploy
+      type: string
+    stack0-redis-forbidden-hosts:
+      phase: deploy
+      type: string
+    stack0-remove-pyc-on-start:
+      default: "1"
+      phase: deploy
+      type: string
+    stack0-runtime-home:
+      phase: deploy
+      type: string
+    stack0-site-studio-startup-poll-seconds:
+      default: "5"
+      phase: deploy
+      type: string
+    stack0-site-studio-startup-wait-seconds:
+      default: "90"
+      phase: deploy
+      type: string
+    stack0-tcp-probe-timeout-sec:
+      phase: deploy
+      type: string
+    stack0-tika-http-health-suffix:
+      phase: deploy
+      type: string
+    stack0-uvicorn-timeout-graceful-shutdown:
+      phase: deploy
+      type: string
+    stack0-uvicorn-timeout-keep-alive:
+      phase: deploy
+      type: string
+    stack2-llm-debug-save-dir:
+      phase: deploy
+      type: string
+    stack4-gotenberg-host-port:
+      phase: deploy
+      type: integer
+    stack4-ocrmypdf-host-port:
+      phase: deploy
+      type: integer
+    stack4-paperless-host-port:
+      phase: deploy
+      type: integer
+    stack4-tesseract-host-port:
+      phase: deploy
+      type: integer
+    stack4-tika-host-port:
+      phase: deploy
+      type: integer
+    telegram-api-hash:
+      phase: deploy
+      type: string
+    telegram-api-id:
+      phase: deploy
+      type: string
+    telegram-webhook-base-url:
+      phase: deploy
+      type: string
+    tika-url:
+      default: http://stack4-tika:9998
+      phase: deploy
+      type: string
+    ugs-sanitize-string-max-chars:
+      phase: deploy
+      type: string
+    ugs-use-airflow:
+      phase: deploy
+      type: string
+    user-site-studio-admin-app-url:
+      default: https://app.eliteew.ru
+      phase: deploy
+      type: string
+    user-site-studio-db-schema-strategy:
+      default: db-push
+      phase: deploy
+      type: string
+    user-site-studio-health-poll:
+      default: "3"
+      phase: deploy
+      type: string
+    user-site-studio-health-timeout:
+      default: "420"
+      phase: deploy
+      type: string
+    user-site-studio-public-base-domain:
+      default: eliteew.ru
+      phase: deploy
+      type: string
+    user-site-studio-public-host-label-suffix:
+      default: -site
+      phase: deploy
+      type: string
+    user-site-studio-public-scheme:
+      default: https
+      phase: deploy
+      type: string
+    whisper-batch-size:
+      phase: deploy
+      type: string
+    whisper-beam-size:
+      phase: deploy
+      type: string
+    whisper-compute-type:
+      phase: deploy
+      type: string
+    whisper-device:
+      phase: deploy
+      type: string
+    whisper-enabled:
+      phase: deploy
+      type: string
+    whisper-language:
+      phase: deploy
+      type: string
+    whisper-model-dir:
+      phase: deploy
+      type: string
+    whisper-model-size:
+      phase: deploy
+      type: string
+    whisper-vad-filter:
+      phase: deploy
+      type: string
+    ws-host-port:
+      phase: deploy
+      type: integer
+  resources:
+    res-chroma-chroma:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack1/chroma
+    res-chroma-uvicorn-log-configyaml:
+      include:
+        - uvicorn-log-config.yaml
+      source: data/stack1
+    res-elasticsearch-elasticsearch:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack1/elasticsearch
+    res-elasticsearch-elasticsearchyml:
+      include:
+        - elasticsearch.yml
+      source: data/stack1/elasticsearch_config
+    res-elasticsearch-jvmoptions:
+      include:
+        - jvm.options
+      source: data/stack1/elasticsearch_config
+    res-eliteew-api-prod-api:
+      allowEmpty: true
+      include:
+        - "**"
+      source: shared/api
+    res-eliteew-api-prod-binaries:
+      allowEmpty: true
+      include:
+        - "**"
+      source: local/binaries
+    res-eliteew-api-prod-comfyui:
+      allowEmpty: true
+      include:
+        - "**"
+      source: host/comfyui
+    res-eliteew-api-prod-dist-build:
+      allowEmpty: true
+      include:
+        - "**"
+      source: shared/web/frontend/dist-build
+    res-eliteew-api-prod-documentation:
+      allowEmpty: true
+      include:
+        - "**"
+      source: documentation
+    res-eliteew-api-prod-eliteew-api-prod:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack0/eliteew-api-prod
+    res-eliteew-api-prod-generated-files:
+      allowEmpty: true
+      include:
+        - "**"
+      source: host/generated_files
+    res-eliteew-api-prod-lib:
+      allowEmpty: true
+      include:
+        - "**"
+      source: docker/builders/stack0-api/scripts/lib
+    res-eliteew-api-prod-olenti:
+      allowEmpty: true
+      include:
+        - "**"
+      source: site-templates/olenti
+    res-eliteew-api-prod-start-allsh:
+      include:
+        - start_all.sh
+      source: docker/builders/stack0-api/scripts
+    res-eliteew-api-prod-voice-contractjson:
+      include:
+        - voice_contract.json
+      source: docker/data/stack9/qwen3-tts
+    res-eliteew-api-prod-voice-profilesjson:
+      include:
+        - voice_profiles.json
+      source: docker/data/stack9/qwen3-tts
+    res-eliteew-celery-beat-prod-api:
+      allowEmpty: true
+      include:
+        - "**"
+      source: shared/api
+    res-eliteew-celery-beat-prod-eliteew-celery-beat-prod:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack0/eliteew-celery-beat-prod
+    res-eliteew-frontend-prod-desktop-client-updates:
+      allowEmpty: true
+      include:
+        - "**"
+      source: docker/data/desktop-client-updates
+    res-eliteew-frontend-prod-dist-build:
+      allowEmpty: true
+      include:
+        - "**"
+      source: shared/web/frontend/dist-build
+    res-eliteew-frontend-prod-docker-entrypoint-cspsh:
+      include:
+        - docker-entrypoint-csp.sh
+      source: docker/builders/stack0-frontend
+    res-eliteew-frontend-prod-eliteew-frontend-prod:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack0/eliteew-frontend-prod
+    res-eliteew-frontend-prod-fofline-updates:
+      allowEmpty: true
+      include:
+        - "**"
+      source: docker/data/fofline-updates
+    res-eliteew-frontend-prod-nginxprodconf:
+      include:
+        - nginx.prod.conf
+      source: shared/web/frontend
+    res-eliteew-frontend-prod-snippets:
+      allowEmpty: true
+      include:
+        - "**"
+      source: shared/web/frontend/nginx/snippets
+    res-gotenberg-gotenberg:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack4/gotenberg
+    res-gotenberg-log-to-filesh:
+      include:
+        - log-to-file.sh
+      source: scripts
+    res-keycloak-keycloak:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack6/keycloak
+    res-keycloak-postgres-keycloak-postgres:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack6/keycloak-postgres
+    res-keycloak-themes:
+      allowEmpty: true
+      include:
+        - "**"
+      source: keycloak/themes
+    res-ocrmypdf-api-log-to-filesh:
+      include:
+        - log-to-file.sh
+      source: scripts
+    res-ocrmypdf-api-ocrmypdf-api:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack4/ocrmypdf-api
+    res-paperless-data:
+      allowEmpty: true
+      include:
+        - "**"
+      source: data/stack4/paperless/data
+    res-paperless-export:
+      allowEmpty: true
+      include:
+        - "**"
+      source: data/stack4/paperless/export
+    res-paperless-media:
+      allowEmpty: true
+      include:
+        - "**"
+      source: data/stack4/paperless/media
+    res-paperless-paperless:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack4/paperless
+    res-postgres-postgres:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack1/postgres
+    res-postgres-postgresql:
+      allowEmpty: true
+      exclude:
+        - postgresql.conf
+      include:
+        - "**"
+      source: data/stack1/postgresql
+    res-postgres-postgresqlconf:
+      include:
+        - postgresql.conf
+      source: data/stack1/postgresql
+    res-qdrant-productionyaml:
+      include:
+        - production.yaml
+      source: data/stack1/qdrant-config
+    res-qdrant-qdrant:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack1/qdrant
+    res-rabbitmq-rabbitmq:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack1/rabbitmq
+    res-rabbitmq-rabbitmq-conf:
+      allowEmpty: true
+      include:
+        - "**"
+      source: data/stack1/rabbitmq-conf
+    res-redis-redis:
+      allowEmpty: true
+      include:
+        - "**"
+      source: data/stack1/redis
+    res-seaweedfs-data:
+      allowEmpty: true
+      include:
+        - "**"
+      source: data/stack1/seaweedfs/data
+    res-seaweedfs-seaweedfs:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack1/seaweedfs
+    res-stack-ewa-postgres-postgresql:
+      allowEmpty: true
+      include:
+        - "**"
+      source: data/ewa/postgresql
+    res-tesseract-log-to-filesh:
+      include:
+        - log-to-file.sh
+      source: scripts
+    res-tesseract-tesseract:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack4/tesseract
+    res-tika-log-to-filesh:
+      include:
+        - log-to-file.sh
+      source: scripts
+    res-tika-tika:
+      allowEmpty: true
+      include:
+        - "**"
+      source: logs/stack4/tika
+  secrets:
+    airflow-password:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    desktop-client-binding-spi-token:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    elasticsearch-password:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    env-file-env-stack0-api:
+      delivery: file
+      description: Imported env_file reference (file contents not read)
+      required: true
+    env-file-env-stack0-jobs:
+      delivery: file
+      description: Imported env_file reference (file contents not read)
+      required: true
+    env-file-env-stack0-shared:
+      delivery: file
+      description: Imported env_file reference (file contents not read)
+      required: true
+    ewa-postgres-password:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    jitsi-app-secret:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    jitsi-jwt-secret:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    jwt-secret-key:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    keycloak-admin-password:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    keycloak-client-secret:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    keycloak-db-password:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    minio-secret-key:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    oidc-provider-client-secret:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    paperless-secret-key:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    postgres-password:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    rabbitmq-password:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    redis-password:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    secret-key:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+    telegram-bot-token:
+      delivery: file
+      description: Suggested from secret interpolation (value not imported)
+      required: true
+  services:
+    chroma:
+      command:
+        - run
+        - --path
+        - /chroma/data
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8000"
+      environment:
+        CHROMA_DB_PATH:
+          literal: /chroma/data
+        CHROMA_SERVER_HOST:
+          literal: 0.0.0.0
+        CHROMA_SERVER_HTTP_PORT:
+          literal: 8000
+        IS_PERSISTENT:
+          literal: "TRUE"
+        PERSIST_DIRECTORY:
+          literal: /chroma/data
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000'
+        interval: 30s
+        retries: 5
+        startPeriod: 40s
+        timeout: 10s
+      image: chroma
+      mounts:
+        - readOnly: false
+          resource: res-chroma-chroma
+          target: /chroma/data
+        - readOnly: false
+          resource: res-chroma-chroma
+          target: /logs
+        - readOnly: true
+          resource: res-chroma-uvicorn-log-configyaml
+          source: uvicorn-log-config.yaml
+          target: /etc/uvicorn-log-config.yaml
+      networks:
+        - ew-net-2847
+      ports:
+        - bind: 127.0.0.1
+          container: 8000
+          host:
+            parameter: chroma-host-port
+      resources:
+        cpus: "2"
+        memory: 8589934592
+      restart: unless-stopped
+    elasticsearch:
+      environment:
+        ES_JAVA_OPTS:
+          literal: -Xms2g -Xmx2g -Djava.locale.providers=CLDR,COMPAT,SPI
+        ES_LOG_STYLE:
+          literal: file
+        TZ:
+          literal: Asia/Vladivostok
+        discovery.type:
+          literal: single-node
+        http.host:
+          literal: 0.0.0.0
+        logger.level:
+          literal: INFO
+        network.host:
+          literal: 0.0.0.0
+        xpack.security.enabled:
+          literal: "false"
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - curl -f http://localhost:9200/_cluster/health || exit 1
+        interval: 30s
+        retries: 5
+        startPeriod: 60s
+        timeout: 10s
+      image: elasticsearch
+      mounts:
+        - readOnly: false
+          resource: res-elasticsearch-elasticsearch
+          target: /usr/share/elasticsearch/data
+        - readOnly: true
+          resource: res-elasticsearch-elasticsearchyml
+          source: elasticsearch.yml
+          target: /usr/share/elasticsearch/config/elasticsearch.yml
+        - readOnly: true
+          resource: res-elasticsearch-jvmoptions
+          source: jvm.options
+          target: /usr/share/elasticsearch/config/jvm.options
+        - readOnly: false
+          resource: res-elasticsearch-elasticsearch
+          target: /logs
+      networks:
+        - ew-net-2847
+      ports:
+        - bind: 127.0.0.1
+          container: 9200
+          host:
+            parameter: elasticsearch-host-port
+      resources:
+        cpus: "2"
+        memory: 8589934592
+      restart: unless-stopped
+      user: 1000:1000
+    eliteew-api-prod:
+      environment:
+        ADMIN_PANEL_ENABLED:
+          parameter: admin-panel-enabled
+        AIRFLOW_PASSWORD:
+          secret: airflow-password
+        AIRFLOW_URL:
+          parameter: airflow-url
+        AIRFLOW_USERNAME:
+          parameter: airflow-username
+        AI_EMBEDDINGS_DIMENSION:
+          parameter: ai-embeddings-dimension
+        AI_EMBEDDINGS_FALLBACK_MODEL:
+          parameter: ai-embeddings-fallback-model
+        ANONYMIZED_TELEMETRY:
+          parameter: anonymized-telemetry
+        API_HOST:
+          parameter: api-host
+        API_PORT:
+          parameter: api-port
+        API_WORKERS:
+          parameter: api-workers
+        ASYNCPG_POOL_MAX_SIZE:
+          parameter: asyncpg-pool-max-size
+        ASYNCPG_POOL_MIN_SIZE:
+          parameter: asyncpg-pool-min-size
+        AUTH_PROVIDER_BACKEND:
+          parameter: auth-provider-backend
+        AUTH_PROVIDER_SHADOW_BACKEND:
+          parameter: auth-provider-shadow-backend
+        AUTH_PROVIDER_SHADOW_ENABLED:
+          parameter: auth-provider-shadow-enabled
+        AUTH_ROLE_CLIENT_IDS:
+          parameter: auth-role-client-ids
+        AWS_REGION:
+          parameter: aws-region
+        AWS_S3_ENDPOINT:
+          parameter: aws-s3-endpoint
+        BROWSER_RENDER_SERVICE_URL:
+          parameter: browser-render-service-url
+        CELERY_BROKER_URL:
+          parts:
+            - literal: "redis://:"
+            - secret: redis-password
+            - literal: "@"
+            - parameter: redis-host
+            - literal: ":"
+            - parameter: redis-port
+            - literal: /
+            - parameter: celery-redis-db
+        CELERY_RESULT_BACKEND:
+          parts:
+            - literal: "redis://:"
+            - secret: redis-password
+            - literal: "@"
+            - parameter: redis-host
+            - literal: ":"
+            - parameter: redis-port
+            - literal: /
+            - parameter: celery-redis-db
+        CHROMADB_CONTAINER_NAME:
+          parameter: chromadb-container-name
+        CHROMADB_EXTERNAL_HOST:
+          parameter: chromadb-external-host
+        CHROMADB_EXTERNAL_PORT:
+          parameter: chromadb-external-port
+        CHROMADB_HOST:
+          parameter: chromadb-host
+        CHROMADB_PORT:
+          parameter: chromadb-port
+        COMFYUI_DEBUG_SAVE_PROMPT_DIR:
+          parameter: comfyui-debug-save-prompt-dir
+        COMFYUI_URL:
+          parameter: comfyui-url
+        CORS_ALLOWED_ORIGINS:
+          parameter: cors-allowed-origins
+        CUDA_HOME:
+          parameter: cuda-home
+        DATABASE_URL:
+          parameter: database-url
+        DEBUG:
+          parameter: debug
+        DEBUG_MODE:
+          parameter: debug-mode
+        DOCKER_NETWORK:
+          parameter: docker-network
+        ELASTICSEARCH_CONNECT_TIMEOUT:
+          parameter: elasticsearch-connect-timeout
+        ELASTICSEARCH_DEAD_NODE_BACKOFF_FACTOR:
+          parameter: elasticsearch-dead-node-backoff-factor
+        ELASTICSEARCH_EXTERNAL_PORT:
+          literal: "30007"
+        ELASTICSEARCH_HOST:
+          parameter: elasticsearch-host
+        ELASTICSEARCH_MAX_DEAD_NODE_BACKOFF:
+          parameter: elasticsearch-max-dead-node-backoff
+        ELASTICSEARCH_MAX_RETRIES:
+          parameter: elasticsearch-max-retries
+        ELASTICSEARCH_PASSWORD:
+          secret: elasticsearch-password
+        ELASTICSEARCH_PORT:
+          parameter: elasticsearch-port
+        ELASTICSEARCH_REQUEST_TIMEOUT:
+          parameter: elasticsearch-request-timeout
+        ELASTICSEARCH_RETRY_ON_TIMEOUT:
+          parameter: elasticsearch-retry-on-timeout
+        ELASTICSEARCH_SCHEME:
+          parameter: elasticsearch-scheme
+        ELASTICSEARCH_SOFT_RECONNECT_INTERVAL_SEC:
+          parameter: elasticsearch-soft-reconnect-interval-sec
+        ELASTICSEARCH_USER:
+          parameter: elasticsearch-user
+        ELASTIC_MAX_RETRIES:
+          parameter: elastic-max-retries
+        ELITEEW_APP_BUILD_VERSION_FILE:
+          literal: /app/frontend-dist/app-build-version.txt
+        ELITEEW_BEZ_DIAGNOSTIC_LOGS:
+          parameter: eliteew-bez-diagnostic-logs
+        ELITEEW_BEZ_PLANNER_LLM_TIMEOUT_INITIAL_SEC:
+          parameter: eliteew-bez-planner-llm-timeout-initial-sec
+        ELITEEW_BEZ_PLANNER_LLM_TIMEOUT_REPLANNER_SEC:
+          parameter: eliteew-bez-planner-llm-timeout-replanner-sec
+        ELITEEW_BEZ_PLANNER_MODE:
+          parameter: eliteew-bez-planner-mode
+        ELITEEW_BEZ_PLANNER_MODEL:
+          parameter: eliteew-bez-planner-model
+        ELITEEW_LOG_COLOR:
+          literal: "1"
+        ELITEEW_LOG_FILE:
+          literal: /logs/eliteew-api.log
+        ELITEEW_LOG_LEVEL:
+          parameter: eliteew-log-level
+        ELITEEW_PUBLIC_OPENAPI_DOCS:
+          parameter: eliteew-public-openapi-docs
+        ELITEEW_REQUIRE_SITE_STUDIO_WORKER_AT_STARTUP:
+          parameter: eliteew-require-site-studio-worker-at-startup
+        ELITEEW_SITE_STUDIO_ALLOW_INLINE_FALLBACK:
+          parameter: eliteew-site-studio-allow-inline-fallback
+        ENABLE_QUEUE_BI:
+          parameter: enable-queue-bi
+        ENABLE_QUEUE_DOCS:
+          parameter: enable-queue-docs
+        ENABLE_QUEUE_EWRP:
+          parameter: enable-queue-ewrp
+        ENABLE_QUEUE_NOTIFICATIONS:
+          parameter: enable-queue-notifications
+        ENABLE_QUEUE_SITE_STUDIO:
+          parameter: enable-queue-site-studio
+        ENABLE_QUEUE_UGS:
+          parameter: enable-queue-ugs
+        ENABLE_QUEUE_VOICE:
+          parameter: enable-queue-voice
+        ENABLE_RABBITMQ:
+          parameter: enable-rabbitmq
+        ENCRYPTION_ENABLED:
+          parameter: encryption-enabled
+        ENCRYPTION_MASTER_KEY:
+          parameter: encryption-master-key
+        EWRP_LLAMA_OUTLINE_TIMEOUT_SEC:
+          parameter: ewrp-llama-outline-timeout-sec
+        EWRP_LLAMA_SLIDE_TIMEOUT_SEC:
+          parameter: ewrp-llama-slide-timeout-sec
+        EXTERNAL_DOMAIN:
+          parameter: external-domain
+        GENERATED_FILES_BASE:
+          parameter: generated-files-base
+        GOTENBERG_URL:
+          parameter: gotenberg-url
+        HF_HOME:
+          parameter: stack0-hf-home
+        HOME:
+          parameter: stack0-runtime-home
+        HOST_IP:
+          parameter: host-ip
+        IMC_RAG_LLAMA_GENERATE_TIMEOUT_SEC:
+          parameter: imc-rag-llama-generate-timeout-sec
+        IMC_RAG_LLAMA_NUM_CTX:
+          parameter: imc-rag-llama-num-ctx
+        IMC_RAG_LLAMA_REPEAT_LAST_N:
+          parameter: imc-rag-llama-repeat-last-n
+        IMC_RAG_LLAMA_REPEAT_PENALTY:
+          parameter: imc-rag-llama-repeat-penalty
+        IMC_RAG_LLAMA_TOP_P:
+          parameter: imc-rag-llama-top-p
+        IMC_RAG_MAX_PROMPT_CHARS:
+          parameter: imc-rag-max-prompt-chars
+        IMC_RAG_MERGE_MAX_PROMPT_CHARS:
+          parameter: imc-rag-merge-max-prompt-chars
+        IMC_RAG_NUM_PREDICT:
+          parameter: imc-rag-num-predict
+        JITSI_APP_ID:
+          parameter: jitsi-app-id
+        JITSI_APP_SECRET:
+          secret: jitsi-app-secret
+        JITSI_JWT_SECRET:
+          secret: jitsi-jwt-secret
+        JITSI_PUBLIC_URL:
+          parameter: jitsi-public-url
+        JITSI_TOKEN_TTL_SECONDS:
+          parameter: jitsi-token-ttl-seconds
+        JITSI_XMPP_DOMAIN:
+          parameter: jitsi-xmpp-domain
+        JWT_ALGORITHM:
+          parameter: jwt-algorithm
+        JWT_EXPIRATION_MINUTES:
+          parameter: jwt-expiration-minutes
+        JWT_SECRET_KEY:
+          secret: jwt-secret-key
+        KEYCLOAK_CLIENT_ID:
+          parameter: keycloak-client-id
+        KEYCLOAK_CLIENT_SECRET:
+          secret: keycloak-client-secret
+        KEYCLOAK_MOBILE_CLIENT_ID:
+          parameter: keycloak-mobile-client-id
+        KEYCLOAK_PUBLIC_URL:
+          parameter: keycloak-public-url
+        KEYCLOAK_REALM:
+          parameter: keycloak-realm
+        KEYCLOAK_URL:
+          parameter: keycloak-url
+        KEYCLOAK_VERIFY_AUDIENCE:
+          parameter: keycloak-verify-audience
+        KEYCLOAK_WEB_CLIENT_ID:
+          parameter: keycloak-web-client-id
+        LLAMA_EMBEDDING_MODEL:
+          parameter: llama-embedding-model
+        LLAMA_EMBEDDING_URL:
+          literal: http://192.168.1.141:8081
+        LLAMA_EMBED_TIMEOUT_SEC:
+          parameter: llama-embed-timeout-sec
+        LLAMA_MODEL:
+          parameter: llama-model
+        LLAMA_MODEL_BI:
+          parameter: llama-model-bi
+        LLAMA_MODEL_MARKETING:
+          parameter: llama-model-marketing
+        LLAMA_MODEL_MUSIC_TEXT_GEN:
+          parameter: llama-model-music-text-gen
+        LLAMA_URL:
+          parameter: llama-url
+        LLAMA_USE_OPENAI_API:
+          parameter: llama-use-openai-api
+        LOG_FORMAT:
+          parameter: log-format
+        LOG_LEVEL:
+          parameter: log-level
+        MARKETING_CABINET_ROUTER_MODEL:
+          parameter: marketing-cabinet-router-model
+        MARKETING_CACHE_DB:
+          parameter: marketing-cache-db
+        MARKETING_CELERY_QUEUE:
+          parameter: marketing-celery-queue
+        MINIO_ACCESS_KEY:
+          parameter: minio-access-key
+        MINIO_CONSOLE_PORT:
+          parameter: minio-console-port
+        MINIO_EXTERNAL_PORT:
+          parameter: minio-external-port
+        MINIO_HOST:
+          parameter: minio-host
+        MINIO_PORT:
+          parameter: minio-port
+        MINIO_SECRET_KEY:
+          secret: minio-secret-key
+        MINIO_SECURE:
+          parameter: minio-secure
+        MKL_NUM_THREADS:
+          parameter: mkl-num-threads
+        MONITORING_ENABLED:
+          parameter: monitoring-enabled
+        MUSIC_EVOLUTION_DEBUG_JSON_DIR:
+          parameter: music-evolution-debug-json-dir
+        MUSIC_GENERATOR_DEBUG_JSON_DIR:
+          parameter: music-generator-debug-json-dir
+        NODE_ENV:
+          parameter: node-env
+        NVIDIA_DRIVER_CAPABILITIES:
+          parameter: nvidia-driver-capabilities
+        NVIDIA_VISIBLE_DEVICES:
+          parameter: nvidia-visible-devices
+        OIDC_PROVIDER_CLIENT_ID:
+          parameter: oidc-provider-client-id
+        OIDC_PROVIDER_CLIENT_SECRET:
+          secret: oidc-provider-client-secret
+        OIDC_PROVIDER_ISSUER_URL:
+          parameter: oidc-provider-issuer-url
+        OIDC_PROVIDER_VERIFY_AUDIENCE:
+          parameter: oidc-provider-verify-audience
+        OIDC_PROVIDER_WEB_CLIENT_ID:
+          parameter: oidc-provider-web-client-id
+        OMP_NUM_THREADS:
+          parameter: omp-num-threads
+        ONNX_HOME:
+          parameter: stack0-onnx-home
+        PLAYWRIGHT_BROWSERS_PATH:
+          parameter: playwright-browsers-path
+        POSTGRES_DB:
+          parameter: postgres-db
+        POSTGRES_EXTERNAL_PORT:
+          literal: "30000"
+        POSTGRES_HOST:
+          parameter: postgres-host
+        POSTGRES_MAX_OVERFLOW:
+          parameter: postgres-max-overflow
+        POSTGRES_PASSWORD:
+          secret: postgres-password
+        POSTGRES_POOL_RECYCLE:
+          parameter: postgres-pool-recycle
+        POSTGRES_POOL_SIZE:
+          parameter: postgres-pool-size
+        POSTGRES_POOL_TIMEOUT:
+          parameter: postgres-pool-timeout
+        POSTGRES_PORT:
+          parameter: postgres-port
+        POSTGRES_USER:
+          parameter: postgres-user
+        PYTHONDONTWRITEBYTECODE:
+          parameter: pythondontwritebytecode
+        PYTHONPYCACHEPREFIX:
+          parameter: pythonpycacheprefix
+        PYTHONUNBUFFERED:
+          literal: "1"
+        PYTORCH_ALLOC_CONF:
+          parameter: pytorch-alloc-conf
+        QDRANT_CONTAINER_NAME:
+          parameter: qdrant-container-name
+        QDRANT_EXTERNAL_HOST:
+          parameter: qdrant-external-host
+        QDRANT_EXTERNAL_PORT:
+          parameter: qdrant-external-port
+        QDRANT_GRPC_PORT:
+          parameter: qdrant-grpc-port
+        QDRANT_HOST:
+          parameter: qdrant-host
+        QDRANT_PORT:
+          parameter: qdrant-port
+        QWEN3_VOICE_CONTRACT:
+          literal: /app/qwen3-data/voice_contract.json
+        QWEN3_VOICE_PROFILES:
+          literal: /app/qwen3-data/voice_profiles.json
+        RABBITMQ_BLOCKED_CONNECTION_TIMEOUT:
+          parameter: rabbitmq-blocked-connection-timeout
+        RABBITMQ_CONTAINER_NAME:
+          parameter: rabbitmq-container-name
+        RABBITMQ_EXTERNAL_HOST:
+          parameter: rabbitmq-external-host
+        RABBITMQ_EXTERNAL_PORT:
+          parameter: rabbitmq-external-port
+        RABBITMQ_HEARTBEAT:
+          parameter: rabbitmq-heartbeat
+        RABBITMQ_HOST:
+          parameter: rabbitmq-host
+        RABBITMQ_MANAGEMENT_INTERNAL_PORT:
+          parameter: rabbitmq-management-internal-port
+        RABBITMQ_MANAGEMENT_PORT:
+          parameter: rabbitmq-management-port
+        RABBITMQ_PASSWORD:
+          secret: rabbitmq-password
+        RABBITMQ_PORT:
+          parameter: rabbitmq-port
+        RABBITMQ_USER:
+          parameter: rabbitmq-user
+        RABBITMQ_VHOST:
+          parameter: rabbitmq-vhost
+        RAG_RERANK_BASE_URL:
+          literal: http://192.168.1.141:8082
+        RATE_LIMIT_ENABLED:
+          parameter: rate-limit-enabled
+        RATE_LIMIT_PER_MINUTE:
+          parameter: rate-limit-per-minute
+        REDIS_EXTERNAL_PORT:
+          literal: "30001"
+        REDIS_HOST:
+          parameter: redis-host
+        REDIS_PASSWORD:
+          secret: redis-password
+        REDIS_PORT:
+          parameter: redis-port
+        REGISTRATION_ENABLED:
+          parameter: registration-enabled
+        REGISTRATION_REQUIRE_APPROVAL:
+          parameter: registration-require-approval
+        S3_BUCKET:
+          parameter: s3-bucket
+        S3_BUCKET_DEFAULT_ENCRYPTION:
+          parameter: s3-bucket-default-encryption
+        S3_SECURE:
+          parameter: s3-secure
+        S3_USE_PATH_STYLE:
+          parameter: s3-use-path-style
+        SCIENCE_STACK_SERVICE_URL:
+          parameter: science-stack-service-url
+        SECRET_KEY:
+          secret: secret-key
+        SILERO_SERVICE_URL:
+          parameter: silero-service-url
+        SITE_STUDIO_OLENTI_API_IMAGE:
+          parameter: site-studio-olenti-api-image
+        SITE_STUDIO_OLENTI_FRONTEND_IMAGE:
+          parameter: site-studio-olenti-frontend-image
+        SITE_STUDIO_WORKER_READY_WINDOW_SECONDS:
+          parameter: site-studio-worker-ready-window-seconds
+        STACK0_CACHE_DIR:
+          parameter: stack0-cache-dir
+        STACK0_DOC_BUILDER_REL:
+          parameter: stack0-doc-builder-rel
+        STACK0_DOC_DOCFILE_REL:
+          parameter: stack0-doc-docfile-rel
+        STACK0_DOC_ENV_FILE_HINT:
+          parameter: stack0-doc-env-file-hint
+        STACK0_DOC_LLM_OVERVIEW_REL:
+          parameter: stack0-doc-llm-overview-rel
+        STACK0_DOC_REDIS_HOST_HINT:
+          parameter: stack0-doc-redis-host-hint
+        STACK0_DOC_REQUIREMENTS_REL:
+          parameter: stack0-doc-requirements-rel
+        STACK0_DOC_RUNTIME_LAYER_HINT:
+          parameter: stack0-doc-runtime-layer-hint
+        STACK0_DOC_STACK1_HINT:
+          parameter: stack0-doc-stack1-hint
+        STACK0_DOC_STACK4_HINT:
+          parameter: stack0-doc-stack4-hint
+        STACK0_DOC_VOICE_TRANSCRIBE_ENDPOINT:
+          parameter: stack0-doc-voice-transcribe-endpoint
+        STACK0_DOC_WHISPER_BACKEND_HINT:
+          parameter: stack0-doc-whisper-backend-hint
+        STACK0_ENABLE_LEGACY_ML_CACHE_DIRS:
+          parameter: stack0-enable-legacy-ml-cache-dirs
+        STACK0_FFMPEG_BIN:
+          parameter: stack0-ffmpeg-bin
+        STACK0_HF_HOME:
+          parameter: stack0-hf-home
+        STACK0_LL_HTTP_HEALTH_SUFFIX:
+          parameter: stack0-ll-http-health-suffix
+        STACK0_ONNX_HOME:
+          parameter: stack0-onnx-home
+        STACK0_PACKAGE_IMPORT_CHECKLIST:
+          parameter: stack0-package-import-checklist
+        STACK0_PREFLIGHT_FAIL_ON:
+          parameter: stack0-preflight-fail-on
+        STACK0_PREFLIGHT_VERBOSE:
+          parameter: stack0-preflight-verbose
+        STACK0_PYTHON_VENV:
+          parameter: stack0-python-venv
+        STACK0_REDIS_FLUSHALL_ON_START:
+          parameter: stack0-redis-flushall-on-start
+        STACK0_REDIS_FORBIDDEN_HOSTS:
+          parameter: stack0-redis-forbidden-hosts
+        STACK0_REMOVE_PYC_ON_START:
+          parameter: stack0-remove-pyc-on-start
+        STACK0_RUNTIME_HOME:
+          parameter: stack0-runtime-home
+        STACK0_SITE_STUDIO_STARTUP_POLL_SECONDS:
+          parameter: stack0-site-studio-startup-poll-seconds
+        STACK0_SITE_STUDIO_STARTUP_WAIT_SECONDS:
+          parameter: stack0-site-studio-startup-wait-seconds
+        STACK0_TCP_PROBE_TIMEOUT_SEC:
+          parameter: stack0-tcp-probe-timeout-sec
+        STACK0_TIKA_HTTP_HEALTH_SUFFIX:
+          parameter: stack0-tika-http-health-suffix
+        STACK0_UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN:
+          parameter: stack0-uvicorn-timeout-graceful-shutdown
+        STACK0_UVICORN_TIMEOUT_KEEP_ALIVE:
+          parameter: stack0-uvicorn-timeout-keep-alive
+        STACK2_LLM_DEBUG_SAVE_DIR:
+          parameter: stack2-llm-debug-save-dir
+        TELEGRAM_API_HASH:
+          parameter: telegram-api-hash
+        TELEGRAM_API_ID:
+          parameter: telegram-api-id
+        TELEGRAM_BOT_TOKEN:
+          secret: telegram-bot-token
+        TELEGRAM_WEBHOOK_BASE_URL:
+          parameter: telegram-webhook-base-url
+        TIKA_URL:
+          parameter: tika-url
+        TZ:
+          literal: Asia/Vladivostok
+        UGS_SANITIZE_STRING_MAX_CHARS:
+          parameter: ugs-sanitize-string-max-chars
+        UGS_USE_AIRFLOW:
+          parameter: ugs-use-airflow
+        USER_SITE_STUDIO_ADMIN_APP_URL:
+          parameter: user-site-studio-admin-app-url
+        USER_SITE_STUDIO_DB_SCHEMA_STRATEGY:
+          parameter: user-site-studio-db-schema-strategy
+        USER_SITE_STUDIO_HEALTH_POLL:
+          parameter: user-site-studio-health-poll
+        USER_SITE_STUDIO_HEALTH_TIMEOUT:
+          parameter: user-site-studio-health-timeout
+        USER_SITE_STUDIO_INTERNAL_HOST:
+          literal: host.docker.internal
+        USER_SITE_STUDIO_PUBLIC_BASE_DOMAIN:
+          parameter: user-site-studio-public-base-domain
+        USER_SITE_STUDIO_PUBLIC_HOST_LABEL_SUFFIX:
+          parameter: user-site-studio-public-host-label-suffix
+        USER_SITE_STUDIO_PUBLIC_SCHEME:
+          parameter: user-site-studio-public-scheme
+        USER_SITE_STUDIO_RUNTIME_BASE_DIR:
+          literal: /opt/eliteew/host/runtime/user_site_studio
+        USER_SITE_TEMPLATE_ROOT:
+          literal: /app/site-templates/olenti
+        WHISPER_BATCH_SIZE:
+          parameter: whisper-batch-size
+        WHISPER_BEAM_SIZE:
+          parameter: whisper-beam-size
+        WHISPER_COMPUTE_TYPE:
+          parameter: whisper-compute-type
+        WHISPER_DEVICE:
+          parameter: whisper-device
+        WHISPER_ENABLED:
+          parameter: whisper-enabled
+        WHISPER_LANGUAGE:
+          parameter: whisper-language
+        WHISPER_MODEL_DIR:
+          parameter: whisper-model-dir
+        WHISPER_MODEL_SIZE:
+          parameter: whisper-model-size
+        WHISPER_VAD_FILTER:
+          parameter: whisper-vad-filter
+      image: eliteew-api-prod
+      mounts:
+        - readOnly: true
+          resource: res-eliteew-api-prod-api
+          target: /app/api
+        - readOnly: true
+          resource: res-eliteew-api-prod-documentation
+          target: /app/documentation
+        - readOnly: true
+          resource: res-eliteew-api-prod-dist-build
+          target: /app/frontend-dist
+        - readOnly: true
+          resource: res-eliteew-api-prod-binaries
+          target: /app/mobile-release
+        - readOnly: true
+          resource: res-eliteew-api-prod-comfyui
+          target: /app/comfyui
+        - readOnly: false
+          resource: res-eliteew-api-prod-generated-files
+          target: /app/generated_files
+        - readOnly: true
+          resource: res-eliteew-api-prod-olenti
+          target: /app/site-templates/olenti
+        - readOnly: true
+          resource: res-eliteew-api-prod-start-allsh
+          source: start_all.sh
+          target: /app/docker/scripts/start_all.sh
+        - readOnly: true
+          resource: res-eliteew-api-prod-lib
+          target: /app/docker/scripts/lib
+        - readOnly: true
+          resource: res-eliteew-api-prod-voice-contractjson
+          source: voice_contract.json
+          target: /app/qwen3-data/voice_contract.json
+        - readOnly: true
+          resource: res-eliteew-api-prod-voice-profilesjson
+          source: voice_profiles.json
+          target: /app/qwen3-data/voice_profiles.json
+        - readOnly: false
+          resource: res-eliteew-api-prod-eliteew-api-prod
+          target: /logs
+      networks:
+        - ew-net-6211
+        - ew-net-2847
+        - ew-net-9o11
+        - ew-net-4532
+        - ew-net-7198
+        - ew-net-3365
+        - ew-net-5402
+      ports:
+        - container: 8000
+          host:
+            parameter: api-host-port
+        - container: 28999
+          host:
+            parameter: ws-host-port
+      restart: unless-stopped
+      secrets:
+        - ref: airflow-password
+          target: /run/secrets/airflow-password
+        - ref: elasticsearch-password
+          target: /run/secrets/elasticsearch-password
+        - ref: jitsi-app-secret
+          target: /run/secrets/jitsi-app-secret
+        - ref: jitsi-jwt-secret
+          target: /run/secrets/jitsi-jwt-secret
+        - ref: jwt-secret-key
+          target: /run/secrets/jwt-secret-key
+        - ref: keycloak-client-secret
+          target: /run/secrets/keycloak-client-secret
+        - ref: minio-secret-key
+          target: /run/secrets/minio-secret-key
+        - ref: oidc-provider-client-secret
+          target: /run/secrets/oidc-provider-client-secret
+        - ref: postgres-password
+          target: /run/secrets/postgres-password
+        - ref: rabbitmq-password
+          target: /run/secrets/rabbitmq-password
+        - ref: redis-password
+          target: /run/secrets/redis-password
+        - ref: secret-key
+          target: /run/secrets/secret-key
+        - ref: telegram-bot-token
+          target: /run/secrets/telegram-bot-token
+    eliteew-celery-beat-prod:
+      command:
+        - python
+        - -m
+        - celery
+        - -A
+        - api.tasks.celery_app
+        - beat
+        - --loglevel=info
+        - --pidfile=/tmp/celerybeat.pid
+      environment:
+        CELERY_BROKER_URL:
+          parts:
+            - literal: "redis://:"
+            - secret: redis-password
+            - literal: "@"
+            - parameter: redis-host
+            - literal: ":"
+            - parameter: redis-port
+            - literal: /
+            - parameter: celery-redis-db
+        CELERY_RESULT_BACKEND:
+          parts:
+            - literal: "redis://:"
+            - secret: redis-password
+            - literal: "@"
+            - parameter: redis-host
+            - literal: ":"
+            - parameter: redis-port
+            - literal: /
+            - parameter: celery-redis-db
+        CHROMADB_CONTAINER_NAME:
+          parameter: chromadb-container-name
+        CHROMADB_EXTERNAL_HOST:
+          parameter: chromadb-external-host
+        CHROMADB_EXTERNAL_PORT:
+          parameter: chromadb-external-port
+        CHROMADB_HOST:
+          parameter: chromadb-host
+        CHROMADB_PORT:
+          parameter: chromadb-port
+        ELASTICSEARCH_EXTERNAL_PORT:
+          literal: "30007"
+        ELITEEW_LOG_FILE:
+          literal: /logs/eliteew-celery-beat.log
+        ELITEEW_LOG_LEVEL:
+          parameter: eliteew-log-level
+        MINIO_CONSOLE_PORT:
+          parameter: minio-console-port
+        MINIO_EXTERNAL_PORT:
+          parameter: minio-external-port
+        MINIO_HOST:
+          parameter: minio-host
+        MINIO_PORT:
+          parameter: minio-port
+        POSTGRES_EXTERNAL_PORT:
+          literal: "30000"
+        PYTHONUNBUFFERED:
+          literal: "1"
+        QDRANT_CONTAINER_NAME:
+          parameter: qdrant-container-name
+        QDRANT_EXTERNAL_HOST:
+          parameter: qdrant-external-host
+        QDRANT_EXTERNAL_PORT:
+          parameter: qdrant-external-port
+        QDRANT_GRPC_PORT:
+          parameter: qdrant-grpc-port
+        QDRANT_HOST:
+          parameter: qdrant-host
+        QDRANT_PORT:
+          parameter: qdrant-port
+        RABBITMQ_BLOCKED_CONNECTION_TIMEOUT:
+          parameter: rabbitmq-blocked-connection-timeout
+        RABBITMQ_CONTAINER_NAME:
+          parameter: rabbitmq-container-name
+        RABBITMQ_EXTERNAL_HOST:
+          parameter: rabbitmq-external-host
+        RABBITMQ_EXTERNAL_PORT:
+          parameter: rabbitmq-external-port
+        RABBITMQ_HEARTBEAT:
+          parameter: rabbitmq-heartbeat
+        RABBITMQ_HOST:
+          parameter: rabbitmq-host
+        RABBITMQ_MANAGEMENT_INTERNAL_PORT:
+          parameter: rabbitmq-management-internal-port
+        RABBITMQ_MANAGEMENT_PORT:
+          parameter: rabbitmq-management-port
+        RABBITMQ_PORT:
+          parameter: rabbitmq-port
+        RABBITMQ_VHOST:
+          parameter: rabbitmq-vhost
+        REDIS_EXTERNAL_PORT:
+          literal: "30001"
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - "pgrep -f '[c]elery.*beat' >/dev/null || exit 1"
+        interval: 30s
+        retries: 3
+        startPeriod: 60s
+        timeout: 10s
+      image: eliteew-celery-beat-prod
+      mounts:
+        - readOnly: true
+          resource: res-eliteew-celery-beat-prod-api
+          target: /app/api
+        - readOnly: false
+          resource: res-eliteew-celery-beat-prod-eliteew-celery-beat-prod
+          target: /logs
+      networks:
+        - ew-net-6211
+        - ew-net-2847
+        - ew-net-9o11
+        - ew-net-4532
+        - ew-net-7198
+        - ew-net-3365
+        - ew-net-5402
+      restart: unless-stopped
+      secrets:
+        - ref: redis-password
+          target: /run/secrets/redis-password
+    eliteew-frontend-prod:
+      environment:
+        CSP_CONNECT_EXTRA:
+          parameter: csp-connect-extra
+        CSP_FRAME_EXTRA:
+          parameter: csp-frame-extra
+        CSP_IMG_EXTRA:
+          parameter: csp-img-extra
+        CSP_MEDIA_EXTRA:
+          parameter: csp-media-extra
+        ELITEEW_APP_ORIGIN:
+          parameter: eliteew-app-origin
+        ELITEEW_AUTH_ORIGIN:
+          parameter: eliteew-auth-origin
+        ELITEEW_AUTH_UPSTREAM:
+          parameter: eliteew-auth-upstream
+        ELITEEW_FRONTEND_TAIL_ACCESS_TO_STDERR:
+          parameter: eliteew-frontend-tail-access-to-stderr
+        ELITEEW_TLS_CERT:
+          parameter: eliteew-tls-cert
+        ELITEEW_TLS_KEY:
+          parameter: eliteew-tls-key
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - /usr/sbin/curl -sf http://127.0.0.1:8080/ || exit 1
+        interval: 30s
+        retries: 3
+        startPeriod: 20s
+        timeout: 5s
+      image: eliteew-frontend-prod
+      mounts:
+        - readOnly: true
+          resource: res-eliteew-frontend-prod-dist-build
+          target: /usr/share/nginx/html
+        - readOnly: true
+          resource: res-eliteew-frontend-prod-nginxprodconf
+          source: nginx.prod.conf
+          target: /srv/eliteew/nginx.prod.template.conf
+        - readOnly: true
+          resource: res-eliteew-frontend-prod-snippets
+          target: /etc/nginx/snippets
+        - readOnly: true
+          resource: res-eliteew-frontend-prod-docker-entrypoint-cspsh
+          source: docker-entrypoint-csp.sh
+          target: /docker-entrypoint-csp.sh
+        - readOnly: false
+          resource: res-eliteew-frontend-prod-eliteew-frontend-prod
+          target: /logs
+        - readOnly: true
+          resource: res-eliteew-frontend-prod-desktop-client-updates
+          target: /srv/eliteew/desktop-client-updates
+        - readOnly: true
+          resource: res-eliteew-frontend-prod-fofline-updates
+          target: /srv/eliteew/fofline-updates
+      networks:
+        - ew-net-6211
+        - ew-net-9o11
+      ports:
+        - bind: 127.0.0.1
+          container: 8080
+          host:
+            parameter: frontend-http-port
+      restart: unless-stopped
+      user: 0:0
+    gotenberg:
+      command:
+        - /logs/gotenberg.log
+        - gotenberg
+      entrypoint:
+        - /usr/local/bin/log-to-file.sh
+      environment:
+        TZ:
+          literal: Asia/Vladivostok
+        XDG_CACHE_HOME:
+          literal: /tmp
+        XDG_CONFIG_HOME:
+          literal: /tmp
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - curl -f http://localhost:3000/ || exit 1
+        interval: 30s
+        retries: 3
+        startPeriod: 60s
+        timeout: 10s
+      image: gotenberg
+      mounts:
+        - readOnly: false
+          resource: res-gotenberg-gotenberg
+          target: /logs
+        - readOnly: true
+          resource: res-gotenberg-log-to-filesh
+          source: log-to-file.sh
+          target: /usr/local/bin/log-to-file.sh
+      networks:
+        - ew-net-7198
+      ports:
+        - bind: 127.0.0.1
+          container: 3000
+          host:
+            parameter: stack4-gotenberg-host-port
+      restart: unless-stopped
+    keycloak:
+      command:
+        - start
+      dependsOn:
+        - condition: started
+          target: keycloak-postgres
+      environment:
+        DESKTOP_CLIENT_BINDING_SPI_TOKEN:
+          secret: desktop-client-binding-spi-token
+        ELITEEW_BINDING_API_BASE_URL:
+          parameter: eliteew-binding-api-base-url
+        KC_BOOTSTRAP_ADMIN_PASSWORD:
+          secret: keycloak-admin-password
+        KC_BOOTSTRAP_ADMIN_USERNAME:
+          parameter: keycloak-admin
+        KC_CACHE:
+          literal: local
+        KC_DB:
+          literal: postgres
+        KC_DB_PASSWORD:
+          secret: keycloak-db-password
+        KC_DB_URL:
+          literal: jdbc:postgresql://keycloak-postgres:5432/keycloak
+        KC_DB_USERNAME:
+          literal: keycloak
+        KC_HEALTH_ENABLED:
+          literal: "true"
+        KC_HOSTNAME:
+          parameter: kc-hostname
+        KC_HOSTNAME_ADMIN:
+          parameter: kc-hostname-admin
+        KC_HOSTNAME_BACKCHANNEL_DYNAMIC:
+          literal: "true"
+        KC_HOSTNAME_STRICT:
+          literal: "false"
+        KC_HTTP_ENABLED:
+          literal: "true"
+        KC_HTTP_PORT:
+          literal: 8080
+        KC_LOG:
+          literal: console,file
+        KC_LOG_FILE:
+          literal: /logs/keycloak.log
+        KC_LOG_LEVEL:
+          literal: INFO
+        KC_METRICS_ENABLED:
+          literal: "true"
+        KC_PROXY_HEADERS:
+          literal: xforwarded
+        KC_PROXY_TRUSTED_ADDRESSES:
+          parameter: kc-proxy-trusted-addresses
+        KC_TRANSACTION_XA_ENABLED:
+          literal: "false"
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'
+        interval: 30s
+        retries: 5
+        startPeriod: 90s
+        timeout: 10s
+      image: keycloak
+      mounts:
+        - readOnly: false
+          resource: res-keycloak-keycloak
+          target: /logs
+        - readOnly: true
+          resource: res-keycloak-themes
+          target: /opt/keycloak/themes
+      networks:
+        - ew-net-9o11
+      ports:
+        - bind: 127.0.0.1
+          container: 8080
+          host:
+            parameter: keycloak-host-port
+      resources:
+        cpus: "2"
+        memory: 1073741824
+      restart: unless-stopped
+      secrets:
+        - ref: desktop-client-binding-spi-token
+          target: /run/secrets/desktop-client-binding-spi-token
+        - ref: keycloak-admin-password
+          target: /run/secrets/keycloak-admin-password
+        - ref: keycloak-db-password
+          target: /run/secrets/keycloak-db-password
+      user: "1000"
+    keycloak-postgres:
+      command:
+        - postgres
+        - -c
+        - timezone=Asia/Vladivostok
+        - -c
+        - log_timezone=Asia/Vladivostok
+      environment:
+        PGDATA:
+          literal: /var/lib/postgresql/data/pgdata
+        POSTGRES_DB:
+          literal: keycloak
+        POSTGRES_PASSWORD:
+          secret: keycloak-db-password
+        POSTGRES_USER:
+          literal: keycloak
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - pg_isready -U keycloak
+        interval: 60s
+        retries: 3
+        startPeriod: 30s
+        timeout: 10s
+      image: keycloak-postgres
+      mounts:
+        - readOnly: false
+          resource: res-keycloak-postgres-keycloak-postgres
+          target: /var/lib/postgresql/data
+        - readOnly: false
+          resource: res-keycloak-postgres-keycloak-postgres
+          target: /logs
+      networks:
+        - ew-net-9o11
+      ports:
+        - bind: 127.0.0.1
+          container: 5432
+          host:
+            parameter: keycloak-postgres-host-port
+      resources:
+        cpus: "2"
+        memory: 1073741824
+      restart: unless-stopped
+      secrets:
+        - ref: keycloak-db-password
+          target: /run/secrets/keycloak-db-password
+    ocrmypdf-api:
+      command:
+        - /logs/ocrmypdf.log
+        - /app/.venv/bin/python
+        - app.py
+      entrypoint:
+        - /usr/local/bin/log-to-file.sh
+      environment:
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - curl -f http://localhost:5000/ || exit 1
+        interval: 30s
+        retries: 3
+        startPeriod: 90s
+        timeout: 10s
+      image: ocrmypdf-api
+      mounts:
+        - readOnly: false
+          resource: res-ocrmypdf-api-ocrmypdf-api
+          target: /logs
+        - readOnly: true
+          resource: res-ocrmypdf-api-log-to-filesh
+          source: log-to-file.sh
+          target: /usr/local/bin/log-to-file.sh
+      networks:
+        - ew-net-7198
+      ports:
+        - bind: 127.0.0.1
+          container: 5000
+          host:
+            parameter: stack4-ocrmypdf-host-port
+      restart: unless-stopped
+    paperless:
+      environment:
+        PAPERLESS_DBHOST:
+          parameter: paperless-dbhost
+        PAPERLESS_DBNAME:
+          parameter: paperless-dbname
+        PAPERLESS_DBPASS:
+          parameter: paperless-dbpass
+        PAPERLESS_DBUSER:
+          parameter: paperless-dbuser
+        PAPERLESS_LOGGING_DIR:
+          literal: /logs
+        PAPERLESS_REDIS:
+          parameter: paperless-redis
+        PAPERLESS_SECRET_KEY:
+          secret: paperless-secret-key
+        PAPERLESS_TIME_ZONE:
+          parameter: paperless-time-zone
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - curl -f http://localhost:8000/api/ || exit 1
+        interval: 30s
+        retries: 5
+        startPeriod: 120s
+        timeout: 10s
+      image: paperless
+      mounts:
+        - readOnly: false
+          resource: res-paperless-data
+          target: /usr/src/paperless/data
+        - readOnly: false
+          resource: res-paperless-media
+          target: /usr/src/paperless/media
+        - readOnly: false
+          resource: res-paperless-export
+          target: /usr/src/paperless/export
+        - readOnly: false
+          resource: res-paperless-paperless
+          target: /logs
+      networks:
+        - ew-net-7198
+        - ew-net-2847
+      ports:
+        - bind: 127.0.0.1
+          container: 8000
+          host:
+            parameter: stack4-paperless-host-port
+      restart: unless-stopped
+      secrets:
+        - ref: paperless-secret-key
+          target: /run/secrets/paperless-secret-key
+    postgres:
+      command:
+        - postgres
+        - -c
+        - config_file=/etc/postgresql/postgresql.conf
+        - -c
+        - log_destination=csvlog
+        - -c
+        - logging_collector=on
+        - -c
+        - log_directory=/logs
+        - -c
+        - log_file_mode=0644
+        - -c
+        - timezone=Asia/Vladivostok
+        - -c
+        - log_timezone=Asia/Vladivostok
+        - -c
+        - checkpoint_timeout=10min
+        - -c
+        - checkpoint_completion_target=0.9
+        - -c
+        - max_wal_size=8GB
+      environment:
+        PGDATA:
+          literal: /var/lib/postgresql/data/pgdata
+        POSTGRES_DB:
+          parameter: postgres-db
+        POSTGRES_PASSWORD:
+          secret: postgres-password
+        POSTGRES_USER:
+          parameter: postgres-user
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+        interval: 30s
+        retries: 5
+        startPeriod: 40s
+        timeout: 10s
+      image: postgres
+      mounts:
+        - readOnly: false
+          resource: res-postgres-postgresql
+          target: /var/lib/postgresql/data
+        - readOnly: true
+          resource: res-postgres-postgresqlconf
+          source: postgresql.conf
+          target: /etc/postgresql/postgresql.conf
+        - readOnly: false
+          resource: res-postgres-postgres
+          target: /logs
+      networks:
+        - ew-net-2847
+      ports:
+        - bind: 127.0.0.1
+          container: 5432
+          host:
+            parameter: postgres-host-port
+      resources:
+        cpus: "4"
+        memory: 25769803776
+      restart: unless-stopped
+      secrets:
+        - ref: postgres-password
+          target: /run/secrets/postgres-password
+    qdrant:
+      environment:
+        QDRANT__LOG_LEVEL:
+          literal: info
+        QDRANT__TELEMETRY_DISABLED:
+          literal: "true"
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - timeout 5 bash -c 'echo > /dev/tcp/127.0.0.1/6333' || exit 1
+        interval: 30s
+        retries: 5
+        startPeriod: 40s
+        timeout: 10s
+      image: qdrant
+      mounts:
+        - readOnly: false
+          resource: res-qdrant-qdrant
+          target: /qdrant/storage
+        - readOnly: false
+          resource: res-qdrant-qdrant
+          target: /logs
+        - readOnly: true
+          resource: res-qdrant-productionyaml
+          source: production.yaml
+          target: /qdrant/config/production.yaml
+      networks:
+        - ew-net-2847
+      ports:
+        - bind: 127.0.0.1
+          container: 6333
+          host:
+            parameter: qdrant-grpc-host-port
+        - bind: 127.0.0.1
+          container: 6334
+          host:
+            parameter: qdrant-http-host-port
+      resources:
+        cpus: "2"
+        memory: 8589934592
+      restart: unless-stopped
+      user: 1000:1000
+    rabbitmq:
+      environment:
+        RABBITMQ_DEFAULT_PASS:
+          secret: rabbitmq-password
+        RABBITMQ_DEFAULT_USER:
+          literal: admin
+        RABBITMQ_HANDSHAKE_TIMEOUT:
+          literal: 10000
+        RABBITMQ_HEARTBEAT:
+          literal: 60
+        RABBITMQ_LOGS:
+          literal: /logs/rabbitmq.log
+        RABBITMQ_NODE_IP_ADDRESS:
+          literal: 0.0.0.0
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - rabbitmq-diagnostics
+          - -q
+          - ping
+        interval: 30s
+        retries: 5
+        startPeriod: 40s
+        timeout: 10s
+      image: rabbitmq
+      mounts:
+        - readOnly: false
+          resource: res-rabbitmq-rabbitmq
+          target: /var/lib/rabbitmq
+        - readOnly: true
+          resource: res-rabbitmq-rabbitmq-conf
+          target: /etc/rabbitmq/conf.d
+        - readOnly: false
+          resource: res-rabbitmq-rabbitmq
+          target: /logs
+      networks:
+        - ew-net-2847
+      ports:
+        - bind: 127.0.0.1
+          container: 5672
+          host:
+            parameter: rabbitmq-amqp-port
+        - bind: 127.0.0.1
+          container: 15672
+          host:
+            parameter: rabbitmq-mgmt-port
+      resources:
+        cpus: "1"
+        memory: 2147483648
+      restart: unless-stopped
+      secrets:
+        - ref: rabbitmq-password
+          target: /run/secrets/rabbitmq-password
+    redis:
+      command:
+        - redis-server
+        - --appendonly
+        - yes
+        - --save
+        - 900 1
+        - --save
+        - 300 10000
+        - --maxmemory
+        - 8gb
+        - --maxmemory-policy
+        - allkeys-lru
+        - --latency-monitor-threshold
+        - "100"
+        - --protected-mode
+        - no
+        - --requirepass
+        - secret: redis-password
+        - --rename-command
+        - CONFIG
+        - CONFIG_b8f3d2a9e4c1
+        - --rename-command
+        - SHUTDOWN
+        - SHUTDOWN_a7e2c9b4f1d3
+        - --rename-command
+        - DEBUG
+        - DEBUG_c4e1a9f2d7b3
+        - --rename-command
+        - MODULE
+        - MODULE_e8b2d5a1c9f4
+        - --rename-command
+        - REPLICAOF
+        - REPLICAOF_f3a6c8e2b1d9
+        - --dir
+        - /data
+        - --logfile
+        - literal: ""
+      environment:
+        TZ:
+          literal: Asia/Vladivostok
+      image: redis
+      mounts:
+        - readOnly: false
+          resource: res-redis-redis
+          target: /data
+      networks:
+        - ew-net-2847
+      ports:
+        - bind: 127.0.0.1
+          container: 6379
+          host:
+            parameter: redis-host-port
+      resources:
+        cpus: "2"
+        memory: 10737418240
+      restart: unless-stopped
+    seaweedfs:
+      command:
+        - -logdir=/logs
+        - server
+        - -s3
+        - -filer
+        - -dir=/data
+        - -master.port=9333
+        - -volume.port=8080
+        - -volume.max=64
+        - -volume.preStopSeconds=3
+        - -filer.port=8888
+        - -s3.port=8333
+        - -master.defaultReplication=000
+      environment:
+        AWS_ACCESS_KEY_ID:
+          parameter: minio-access-key
+        AWS_SECRET_ACCESS_KEY:
+          secret: minio-secret-key
+        TZ:
+          literal: Asia/Vladivostok
+        WEED_GID:
+          literal: "1000"
+        WEED_UID:
+          literal: "1000"
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - nc -z 127.0.0.1 9333 || exit 1
+        interval: 30s
+        retries: 5
+        startPeriod: 40s
+        timeout: 10s
+      image: seaweedfs
+      mounts:
+        - readOnly: false
+          resource: res-seaweedfs-data
+          target: /data
+        - readOnly: false
+          resource: res-seaweedfs-seaweedfs
+          target: /logs
+      networks:
+        - ew-net-2847
+      ports:
+        - bind: 127.0.0.1
+          container: 9333
+          host:
+            parameter: seaweedfs-master-port
+        - bind: 127.0.0.1
+          container: 8888
+          host:
+            parameter: seaweedfs-filer-port
+        - bind: 127.0.0.1
+          container: 8333
+          host:
+            parameter: seaweedfs-s3-port
+      resources:
+        cpus: "2"
+        memory: 4294967296
+      restart: unless-stopped
+      secrets:
+        - ref: minio-secret-key
+          target: /run/secrets/minio-secret-key
+    stack-ewa-postgres:
+      command:
+        - postgres
+        - -c
+        - timezone=Asia/Vladivostok
+        - -c
+        - log_timezone=Asia/Vladivostok
+      environment:
+        POSTGRES_DB:
+          parameter: ewa-postgres-db
+        POSTGRES_PASSWORD:
+          secret: ewa-postgres-password
+        POSTGRES_USER:
+          parameter: ewa-postgres-user
+        TZ:
+          parameter: ewa-pg-tz
+      environmentFrom: postgres
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+        interval: 30s
+        retries: 5
+        startPeriod: 40s
+        timeout: 10s
+      image: stack-ewa-postgres
+      mounts:
+        - readOnly: false
+          resource: res-stack-ewa-postgres-postgresql
+          target: /var/lib/postgresql/data
+      networks:
+        - ew-net-2847
+      ports:
+        - bind: 127.0.0.1
+          container: 5432
+          host:
+            parameter: ewa-postgres-host-port
+      restart: unless-stopped
+      secrets:
+        - ref: ewa-postgres-password
+          target: /run/secrets/ewa-postgres-password
+    tesseract:
+      command:
+        - /logs/tesseract.log
+        - uvicorn
+        - server:app
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8884"
+      entrypoint:
+        - /usr/local/bin/log-to-file.sh
+      environment:
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8884/', timeout=5)" || exit 1
+        interval: 30s
+        retries: 5
+        startPeriod: 60s
+        timeout: 10s
+      image: tesseract
+      mounts:
+        - readOnly: false
+          resource: res-tesseract-tesseract
+          target: /logs
+        - readOnly: true
+          resource: res-tesseract-log-to-filesh
+          source: log-to-file.sh
+          target: /usr/local/bin/log-to-file.sh
+      networks:
+        - ew-net-7198
+      ports:
+        - bind: 127.0.0.1
+          container: 8884
+          host:
+            parameter: stack4-tesseract-host-port
+      restart: unless-stopped
+    tika:
+      command:
+        - /logs/tika.log
+        - sh
+        - -c
+        - exec java -jar $(ls /tika-server*.jar 2>/dev/null | head -1) -h 0.0.0.0
+      entrypoint:
+        - /usr/local/bin/log-to-file.sh
+      environment:
+        JAVA_TOOL_OPTIONS:
+          literal: -Xmx1024m
+        TZ:
+          literal: Asia/Vladivostok
+      healthcheck:
+        command:
+          - /bin/sh
+          - -c
+          - timeout 5 bash -c 'echo > /dev/tcp/127.0.0.1/9998' || exit 1
+        interval: 30s
+        retries: 5
+        startPeriod: 90s
+        timeout: 10s
+      image: tika
+      mounts:
+        - readOnly: false
+          resource: res-tika-tika
+          target: /logs
+        - readOnly: true
+          resource: res-tika-log-to-filesh
+          source: log-to-file.sh
+          target: /usr/local/bin/log-to-file.sh
+      networks:
+        - ew-net-7198
+      ports:
+        - bind: 127.0.0.1
+          container: 9998
+          host:
+            parameter: stack4-tika-host-port
+      resources:
+        memory: 1610612736
+      restart: unless-stopped
+      user: 35002:35002
+  target:
+    profile: compose-docker/v1
+  x-ui:
+    viewport:
+      x: 435.08659217877096
+      y: 26
+      zoom: 0.9962756052141527

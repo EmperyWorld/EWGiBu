@@ -1,0 +1,31 @@
+{
+  "apiVersion": "iacpack.policy/v1",
+  "kind": "CompilePolicy",
+  "metadata": {
+    "name": "two-service-import"
+  },
+  "spec": {
+    "registries": {
+      "allow": ["docker.io", "ghcr.io", "quay.io"]
+    },
+    "capabilities": {
+      "developmentBuilds": true,
+      "buildNetwork": false,
+      "externalNetworks": true,
+      "externalVolumes": false,
+      "includeRuntime": false,
+      "embedImages": false
+    },
+    "quotas": {
+      "maxEntries": 50000,
+      "maxEntryBytes": 4294967296,
+      "maxExpandedBytes": 21474836480,
+      "maxCompressionRatio": 200,
+      "maxPathBytes": 255
+    },
+    "resourceCeilings": {
+      "cpus": "1024",
+      "memoryBytes": 1099511627776
+    }
+  }
+}

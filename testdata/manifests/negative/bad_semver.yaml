@@ -1,0 +1,16 @@
+apiVersion: iacpack.io/v1alpha1
+kind: Project
+metadata:
+  name: example
+  version: v0.1.0
+spec:
+  target:
+    profile: compose-docker/v1
+  mode: release
+  images:
+    app:
+      ref: docker.io/library/nginx@sha256:0000000000000000000000000000000000000000000000000000000000000001
+      delivery: pull
+  services:
+    app:
+      image: app

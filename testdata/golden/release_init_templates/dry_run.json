@@ -1,0 +1,36 @@
+{
+  "command": "release init-templates",
+  "diagnostics": [],
+  "ok": true,
+  "result": {
+    "files": [
+      {
+        "action": "create",
+        "bytes": 49,
+        "path": ".gitattributes",
+        "sha256": "c5541725e7506ce50817798403374ba0c71d421954b8849470f1f69941127efa"
+      },
+      {
+        "action": "create",
+        "bytes": 2244,
+        "path": ".github/workflows/iacpack-ci.yml",
+        "sha256": "797c583d366bd623f72f221c78385cc208d16ef4aa3bc2a9570e13a6ff6fe020"
+      },
+      {
+        "action": "create",
+        "bytes": 75,
+        "path": ".gitignore",
+        "sha256": "d8e8f16fa7666d6f49ab5c54f599c9beace22e2ce2ad155b48486855f6410f5e"
+      },
+      {
+        "action": "create",
+        "bytes": 1352,
+        "path": "docs/iacpack-release.md",
+        "sha256": "77547129bb2f199f27ef926972e9ab0ce78c33820404c94ac0aa364917f83431"
+      }
+    ],
+    "force": false,
+    "wrote": false
+  },
+  "schemaVersion": "iacpack.cli/v1"
+}

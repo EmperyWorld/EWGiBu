@@ -1,0 +1,7 @@
+{
+  "apiVersion": "iacpack.io/v1alpha1",
+  "kind": "Project",
+  "metadata": {
+    "name": "example",
+  }
+}
